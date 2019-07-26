@@ -1,3 +1,18 @@
+analysis_notebooks/__pycache__
+analysis_notebooks/.ipynb_checkpoints
+analysis_notebooks/7*
+analysis_notebooks/10*
+analysis_notebooks/11*
+analysis_notebooks/Basics.ipynb
+analysis_notebooks/Features.ipynb
+analysis_notebooks/.DS_Store
+scripts/__pycache__
+scripts/check_queries.py
+scripts/download_partitions.pickle
+scripts/test.py
+scripts/parallelize*
+scripts/convert.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
