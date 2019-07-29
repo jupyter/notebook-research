@@ -72,13 +72,11 @@ def main():
         
         try:
             if local:
-                with open("download_partitions.pickle", "rb") as f:
+                with open("download_partitions_{0}.pickle".format(worker), "rb") as f:
                     partitions_download = pickle.load(f)
             else:
                 obj = s3.Object("notebook-research", "download_partitions.pickle")
-                print(1)
                 partitions_download = pickle.load(BytesIO(obj.get()["Body"].read()))
-                print(2)
         except Exception as e:
             print((
                 "Download Partitions data were not found {0}. ".format(
@@ -129,12 +127,12 @@ def main():
         "../logs/timing.txt", 
         "download CHECKPOINT 1: {0}".format(check1)
     )
-    
-    # List files already downloaded.
+
     if local:
-        current_files = set(os.listdir("../data/notebooks"))
+        current_files = os.listdir("../data/notebooks")
     else:
-        current_files = list_s3_dir('notebooks/')
+        obj = s3.Object("notebook-research", "current_notebooks.pickle")
+        current_files = pickle.load(BytesIO(obj.get()["Body"].read()))
     
     num_done = len(current_files)
     debug_print(

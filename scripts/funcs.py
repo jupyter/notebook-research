@@ -35,4 +35,4 @@ def list_s3_dir(path):
 	list_dir = set([])
 	for obj in bucket.objects.filter(Prefix = path):
 		list_dir.add(obj.key.split("/")[1])
-	return set(list_dir)
+	return list_dir

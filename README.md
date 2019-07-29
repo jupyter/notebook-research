@@ -24,6 +24,7 @@ The initial collaboration will involve several individuals and institutions:
 
 - `query_git.py`
 - `extract_data.py`
+- `download.py`
 - analysis_notebooks
 - data 
     - json

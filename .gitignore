@@ -12,6 +12,7 @@ scripts/download_partitions.pickle
 scripts/test.py
 scripts/parallelize*
 scripts/convert.py
+*Untitled*.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

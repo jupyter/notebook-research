@@ -1,7 +1,8 @@
+import boto3
 import pandas as pd
+from io import BytesIO
 import re
 import base64
-import boto3
 
 s3 = boto3.resource('s3')
 
@@ -25,11 +26,11 @@ def load(lang = None, local=False):
 #         repos = s3_to_df('csv/repos3.csv')
 
 ## Uncomment section above and DELETE THIS ####################
-    cells = pd.read_csv('../save/cells2.csv')
-    notebooks = pd.read_csv('../save/notebooks3.csv')
-    owners = pd.read_csv('../save/owners2.csv')
-    readmes = pd.read_csv('../save/readmes1.csv')
-    repos = pd.read_csv('../save/repos3.csv')    
+    cells = pd.read_csv('/Users/jenlandy/github/jupyter-resources/notebook-research/save/cells2.csv')
+    notebooks = pd.read_csv('/Users/jenlandy/github/jupyter-resources/notebook-research/save/notebooks3.csv')
+    owners = pd.read_csv('/Users/jenlandy/github/jupyter-resources/notebook-research/save/owners2.csv')
+    readmes = pd.read_csv('/Users/jenlandy/github/jupyter-resources/notebook-research/save/readmes1.csv')
+    repos = pd.read_csv('/Users/jenlandy/github/jupyter-resources/notebook-research/save/repos3.csv')    
     cells = cells.rename(columns = {'comments':'num_comments'}).rename(columns={'comments_words':'comments'})
 ###############################################################
 

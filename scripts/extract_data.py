@@ -83,7 +83,7 @@ def main():
         save = True
     else:
         # Get existing data.
-        owners2_old = get_df("repos2{0}.csv".format(EXTENSION), local)
+        owners2_old = get_df("owners2{0}.csv".format(EXTENSION), local)
         repos2_old = get_df("repos2{0}.csv".format(EXTENSION), local)
 
         debug_print("Data found and opened for {0} owners and {1} repos".format(
@@ -106,8 +106,8 @@ def main():
                 len(owners2_new), len(repos2_new)
             ))
 
-            df_to_s3(owners2_new, "csv/owners2_temp.csv")
-            df_to_s3(repos2_new, "csv/repos2_temp.csv")
+            df_to_s3(owners2_new, "csv/owners2_{0}temp.csv".format(EXTENSION))
+            df_to_s3(repos2_new, "csv/repos2_{0}temp.csv".format(EXTENSION))
             print("Saved temporary csvs.")
 
             owners2 = pd.concat([owners2_old, owners2_new], sort = True)
@@ -339,6 +339,7 @@ def clean_readmes(repos, local):
     else:
         repo_ids = list_s3_dir('readmes/')
     
+    readme_json = None
     unprocessed = 0
     for count, repo_id in enumerate(repo_ids):    
         # Keep track of progress.
@@ -429,6 +430,7 @@ def get_all_nb_cells(notebooks, local):
         
         # Track progress.
         file_name = row["file"]
+        data = None
         if count % 100 == 0:
             print("{0} / {1} notebooks processed for cell data".format(count, len(notebooks)))
 
