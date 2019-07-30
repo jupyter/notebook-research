@@ -77,7 +77,7 @@ def main():
 
     debug_print("Notebooks1, Owners1, and Repos1 were found and opened."+BREAK)
 
-    ### Add information for repositories and owners. ##################
+    ## Add information for repositories and owners. ##################
     if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
         owners2, repos2 = update_owners_repos(owners1, repos1, local)
         save = True
@@ -108,7 +108,7 @@ def main():
 
             df_to_s3(owners2_new, "csv/owners2_{0}temp.csv".format(EXTENSION))
             df_to_s3(repos2_new, "csv/repos2_{0}temp.csv".format(EXTENSION))
-            print("Saved temporary csvs.")
+            print("Saved temporary csvs for {0} owners and {1} repos.".format(len(owners2_new), len(repos2_new)))
 
             owners2 = pd.concat([owners2_old, owners2_new], sort = True)
             repos2 = pd.concat([repos2_old, repos2_new], sort = True)
@@ -139,14 +139,19 @@ def main():
         save = True
     else:
         # Get existing data.
-        readmes1_old = get_df("readmes1{0}.csv".format(EXTENSION), local)
-
-        debug_print("Found and opened data for {0} readmes.".format(
-            len(readmes1_old)
-        ))
+        try:
+            readmes1_old = get_df("readmes1{0}.csv".format(EXTENSION), local)
+            debug_print("Found and opened data for {0} readmes.".format(
+                len(readmes1_old)
+            ))
+        except:
+            readmes1_old = []
 
         # Isolate rows of repos2 correspoding to new notebooks.
-        repos2_new = repos2[~repos2.repo_id.isin(readmes1_old.repo_id)]
+        if len(readmes1_old) > 0:
+            repos2_new = repos2[~repos2.repo_id.isin(readmes1_old.repo_id)] 
+        else:
+            repos2_new = repos2
 
         debug_print("Collecting data for readmes on {0} repos.".format(
             len(repos2_new)
@@ -158,7 +163,10 @@ def main():
             print("Collected data for {0} readmes.".format(
                 len(readmes1_new)
             ))
-            readmes1 = pd.concat([readmes1_old, readmes1_new], sort = True)
+            if len(readmes1_old) > 0:
+                readmes1 = pd.concat([readmes1_old, readmes1_new], sort = True) 
+            else:
+                readmes1 = readmes1_new
             save = True
         else:
             readmes1 = readmes1_old
@@ -173,7 +181,7 @@ def main():
         else:
             df_to_s3(readmes1, "csv/readmes1{0}.csv".format(EXTENSION))
         
-        debug_print("Readmes1 were created and saved.\n"+BREAK)
+        debug_print("Readmes1 was created and saved.\n"+BREAK)
 
     ### Add data on cells within each notebook. #######################
     if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
@@ -181,15 +189,22 @@ def main():
         save = True
     else:
         # Get existing data.
-        notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
-        cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
-
-        debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
+        try:
+            notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
+            cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
+            debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
             len(notebooks2_old), len(cells1_old)
         ))
+        except:
+            notebooks2_old = []
+            cells1_old = []
+       
 
         # Isolate rows of notebooks1 corresponding to new notebooks
-        notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
+        if len(notebooks2_old) > 0:
+            notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
+        else:
+            notebooks1_new = notebooks1
 
         debug_print("Collecting data for {1} notebooks.".format(
             len(notebooks1_new)
@@ -203,7 +218,10 @@ def main():
                 len(notebooks2_new), len(cells1_new)
             ))
 
-            notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
+            if len(notebooks2_old) > 0:
+                notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
+            else:
+                notebooks2 = notebooks2_new
             cells1 = pd.concat([cells1_old, cells1_new], sort = True)
             save = True
         else:
@@ -225,9 +243,9 @@ def main():
 
     
     ### Remove notebooks and associated cells, repos, readmes,  #######
-    ### and owners with incomplete data.                        #######
-    # if not set(["notebooks3.csv", "cells2.csv", "repos3.csv"]).issubset(current_csvs):
-    remove_incomplete(notebooks2, cells1, repos2, local)
+    ## and owners with incomplete data.                        #######
+    if not set(["notebooks3.csv", "cells2.csv", "repos3.csv"]).issubset(current_csvs):
+        remove_incomplete(notebooks2, cells1, repos2, local)
     
     # Check time and report status.
     end = datetime.datetime.now()
@@ -248,9 +266,11 @@ def update_owners_repos(owners, repos, local):
     new_owner_info = {}
     repo_ids = list(repos.repo_id)
     missing = 0
-    repo_json = None
+    forked = 0
 
     for i, repo_id in enumerate(repo_ids):
+        repo_json = None
+
         # Keep track of progress.
         if i % COUNT_TRIGGER == 0:
             debug_print("{0} / {1} repo data files processed".format(i, len(repo_ids)))
@@ -264,12 +284,13 @@ def update_owners_repos(owners, repos, local):
                 missing += 1   
                 # Report missed files.
                 msg = "Repo {0} metadata file did not open or could not process.".format(repo_id)
-                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)   
+                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
         else:
             try:
                 obj = s3.Object("notebook-research","repos/repo_{0}.json".format(repo_id))
                 repo_json = json.loads(obj.get()["Body"].read().decode("UTF-8"))
             except Exception:
+                missing += 1
                 # Report missed files.
                 msg = "Repo {0} metadata did not process.".format(repo_id)
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
@@ -284,10 +305,7 @@ def update_owners_repos(owners, repos, local):
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
                 continue
 
-            if "owner" not in repo_json:
-                print(repo_json)
-            owner_id = repo_json["owner"]["id"]
-                    
+            owner_id = repo_json["owner"]["id"]                    
             if not repo_json["fork"]:   
                 # Add repo info.
                 repo_info = {
@@ -319,10 +337,13 @@ def update_owners_repos(owners, repos, local):
                 }
                 if owner_id not in new_owner_info:
                     new_owner_info[owner_id] = owner_info
+            else:
+                forked += 1
 
     # Display status.
     debug_print("We have {0} repos.".format(len(new_repo_info)))
     debug_print("Couldnt find {0} files.".format(missing))
+    debug_print("{0} were forked.".format(forked))
 
     # Translate dictionaries to DataFrames and save to CSV.
     updated_owners = owners.merge(pd.DataFrame(new_owner_info).transpose().reset_index(drop=True), on = "owner_id")
@@ -337,7 +358,7 @@ def clean_readmes(repos, local):
     if local:
         repo_ids = set([int(f.split(".")[0].split("_")[1]) for f in os.listdir("../data/readmes") if f[-5:] == ".json"])
     else:
-        repo_ids = list_s3_dir('readmes/')
+        repo_ids = [int(f.split(".")[0].split("_")[1]) for f in list_s3_dir('readmes/')]
     
     readme_json = None
     unprocessed = 0
@@ -374,6 +395,8 @@ def clean_readmes(repos, local):
                 # Report missed files.
                 msg = "Repo {0} metadata did not process.".format(repo_id)
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+                debug_print(msg)
+                unprocessed += 1
 
         if readme_json:
             if "message" in readme_json and (
@@ -421,61 +444,65 @@ def get_all_nb_cells(notebooks, local):
     all_cells_info = {}
     missing = []
     
-    if local:
-        current_notebooks = set(os.listdir("../data/notebooks"))
-    else:
-        current_notebooks = list_s3_dir("notebooks/")
-
     for count, row in notebooks.iterrows():
         
         # Track progress.
         file_name = row["file"]
         data = None
-        if count % 100 == 0:
+        if count % COUNT_TRIGGER == 0:
             print("{0} / {1} notebooks processed for cell data".format(count, len(notebooks)))
+            
+            if count > 0:
+                notebooks_temp = pd.DataFrame(new_nb_info).transpose()
+                cells_temp = pd.DataFrame(all_cells_info).transpose().reset_index(drop=True)
 
-        if file_name in current_notebooks:
-            date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
-            if local:
                 try:
-                    f = "../data/notebooks/{0}".format(file_name)
-                    with open(f) as data_file:
-                        data = json.load(data_file)
-                except Exception:
-                    msg = "{0}: had trouble finding or loading {1}".format(date_string, row["file"])
-                    write_to_log("../logs/nb_parse_log.txt", msg)
-                    missing.append(file_name)
+                    if local:
+                        notebooks_temp.to_csv("{0}/notebooks2_{1}_{2}.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        cells_temp.to_csv("{0}/cells1_{1}_{2}.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                    else:
+                        df_to_s3(notebooks_temp, "csv/notebooks2_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(cells_temp, "csv/cells1_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
-                    # Add row with missing values.
-                    nb_info = {
-                        "file": file_name,
-                        "nbformat": "",
-                        "nbformat_minor": "",
-                        "num_cells": 0,
-                        "kernel_lang": "",
-                        "kernel_name": "",
-                        "lang_name": "",
-                        "lang_version": ""
-                    }
-                    if file_name not in new_nb_info:
-                        new_nb_info[file_name]= nb_info
-                    
-                    continue
-            else:
-                try:
-                    obj = s3.Object("notebook-research","notebooks/{0}".format(file_name))
-                    data = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-                except Exception:
-                    # Report missed files.
-                    msg = "Notebook {0} did not open.".format(file_name)
-                    write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
-            if data:
-                if isinstance(data, dict): 
-                    keys = data.keys()
-                else:
-                    keys = []
+                except:
+                    n1 = notebooks_temp.iloc[:len(notebooks_temp)//3]
+                    n2 = notebooks_temp.iloc[len(notebooks_temp)//3:2*len(notebooks_temp)//3]
+                    n3 = notebooks_temp.iloc[2*len(notebooks_temp)//3:]
+                    c1 = cells_temp.iloc[:len(cells_temp)//3]
+                    c2 = cells_temp.iloc[len(cells_temp)//3:2*len(cells_temp)//3]
+                    c3 = cells_temp.iloc[2*len(cells_temp)//3]
+                    if local:
+                        n1.to_csv("{0}/notebooks2_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        n2.to_csv("{0}/notebooks2_{1}_{2}_2.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        n3.to_csv("{0}/notebooks2_{1}_{2}_3.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c1.to_csv("{0}/cells1_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c2.to_csv("{0}/cells1_{1}_{2}_2.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c3.to_csv("{0}/cells1_{1}_{2}_3.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                    else:
+                        df_to_s3(n1, "csv/notebooks2_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n2, "csv/notebooks2_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n3, "csv/notebooks2_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c1, "csv/cells1_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c2, "csv/cells1_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c3, "csv/cells1_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
-                # Initialize row of data.
+                new_nb_info = {}
+                all_cells_info = {}
+                print("CSVs saved")
+
+        date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+        if local:
+            try:
+                f = "../data/notebooks/{0}".format(file_name)
+                with open(f) as data_file:
+                    data = json.load(data_file)
+            except Exception:
+                # Report missed files.
+                msg = "{0}: had trouble finding or loading {1}".format(date_string, row["file"])
+                write_to_log("../logs/nb_parse_log.txt", msg)
+                missing.append(file_name)
+
+                # Add row with missing values.
                 nb_info = {
                     "file": file_name,
                     "nbformat": "",
@@ -486,88 +513,42 @@ def get_all_nb_cells(notebooks, local):
                     "lang_name": "",
                     "lang_version": ""
                 }
-                
-                # Get nb top level format metadata.
-                if "nbformat" in keys:
-                    nb_info["nbformat"] = data["nbformat"]
-                if "nbformat_minor" in keys:
-                    nb_info["nbformat_minor"] = data["nbformat_minor"]
-                
-                # Get info from the metadata dictionary.
-                if "metadata" in keys:
-                    metadata_keys = data["metadata"].keys()
-
-                    # Access language data.
-                    if "kernelspec" in metadata_keys:
-                        kernel_keys = data["metadata"]["kernelspec"].keys()
-                        
-                        # If google colab notebook, only Python 2.7 or 3.6 are possible.
-                        if "colab" in metadata_keys:
-                            if "name" in kernel_keys:
-                                nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["name"]
-                                nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
-                                if nb_info["kernel_lang"] == "python3":
-                                    nb_info["lang_name"] = "python"
-                                    nb_info["lang_version"] = "3.6"
-                                elif nb_info["kernel_lang"] == "python2":
-                                    nb_info["lang_name"] = "python"
-                                    nb_info["lang_version"] = "2.7"
-
-                        else:
-                            if "language" in kernel_keys:
-                                nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["language"]
-                            if "display_name" in kernel_keys:
-                                nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
-
-                    if "language_info" in metadata_keys and "colab" not in metadata_keys:
-                        lang_keys = data["metadata"]["language_info"].keys()
-                        if "name" in lang_keys and "colab" not in metadata_keys:
-                            nb_info["lang_name"] = data["metadata"]["language_info"]["name"]
-                        if "version" in lang_keys and "colab" not in metadata_keys:
-                            nb_info["lang_version"] = data["metadata"]["language_info"]["version"]
-
-                    elif "language" in metadata_keys:
-                        nb_info["lang_name"] = data["metadata"]["language"]
-
-                
-                # Get information about individual cells.
-                cells_info = {}
-                if "cells" in keys:
-                    nb_info["num_cells"] = len(data["cells"]) 
-                    cell_id = 0                
-                    for cell in data["cells"]:
-                        cell_info, nb_language = get_single_cell(cell_id, file_name, cell, nb_info["lang_name"])
-                        
-                        if nb_info["lang_name"] == "":
-                            nb_info["lang_name"] = nb_language.lower()
-                        
-                        if (file_name, cell_id) not in cells_info:
-                            cells_info[(file_name, cell_id)] = cell_info
-                        
-                        cell_id += 1
-                    
-                elif "worksheets" in keys:
-                    cell_id = 0
-                    for w in data["worksheets"]:
-                        for cell in w["cells"]:
-                            cell_info, nb_language = get_single_cell(cell_id, file_name, cell, nb_info["lang_name"])
-                            
-                            if nb_info["lang_name"] == "":
-                                nb_info["lang_name"] = nb_language.lower()
-
-                            if (file_name, cell_id) not in cells_info:
-                                cells_info[(file_name, cell_id)] = cell_info
-                            
-                            cell_id += 1
-                    
-                all_cells_info.update(cells_info)
-     
                 if file_name not in new_nb_info:
                     new_nb_info[file_name]= nb_info
                 
+                continue
         else:
-            # File missing, input row with missing values.
-            missing.append(file_name)
+            try:
+                obj = s3.Object("notebook-research","notebooks/{0}".format(file_name))
+                data = json.loads(obj.get()["Body"].read().decode("UTF-8"))
+            except Exception:
+                # Report missed files.
+                msg = "Notebook {0} did not open.".format(file_name)
+                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+                missing.append(file_name)
+                
+                # Add row with missing values.
+                nb_info = {
+                    "file": file_name,
+                    "nbformat": "",
+                    "nbformat_minor": "",
+                    "num_cells": 0,
+                    "kernel_lang": "",
+                    "kernel_name": "",
+                    "lang_name": "",
+                    "lang_version": ""
+                }
+                if file_name not in new_nb_info:
+                    new_nb_info[file_name]= nb_info
+                
+                continue
+        if data:
+            if isinstance(data, dict): 
+                keys = data.keys()
+            else:
+                keys = []
+
+            # Initialize row of data.
             nb_info = {
                 "file": file_name,
                 "nbformat": "",
@@ -578,6 +559,82 @@ def get_all_nb_cells(notebooks, local):
                 "lang_name": "",
                 "lang_version": ""
             }
+            
+            # Get nb top level format metadata.
+            if "nbformat" in keys:
+                nb_info["nbformat"] = data["nbformat"]
+            if "nbformat_minor" in keys:
+                nb_info["nbformat_minor"] = data["nbformat_minor"]
+            
+            # Get info from the metadata dictionary.
+            if "metadata" in keys and type(data["metadata"])!=list and data["metadata"] != None:
+                metadata_keys = data["metadata"].keys()
+
+                # Access language data.
+                if "kernelspec" in metadata_keys and data["metadata"]["kernelspec"] != None:
+                    kernel_keys = data["metadata"]["kernelspec"].keys()
+                    
+                    # If google colab notebook, only Python 2.7 or 3.6 are possible.
+                    if "colab" in metadata_keys:
+                        if "name" in kernel_keys:
+                            nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["name"]
+                            nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
+                            if nb_info["kernel_lang"] == "python3":
+                                nb_info["lang_name"] = "python"
+                                nb_info["lang_version"] = "3.6"
+                            elif nb_info["kernel_lang"] == "python2":
+                                nb_info["lang_name"] = "python"
+                                nb_info["lang_version"] = "2.7"
+
+                    else:
+                        if "language" in kernel_keys:
+                            nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["language"]
+                        if "display_name" in kernel_keys:
+                            nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
+
+                if "language_info" in metadata_keys and "colab" not in metadata_keys:
+                    lang_keys = data["metadata"]["language_info"].keys()
+                    if "name" in lang_keys and "colab" not in metadata_keys:
+                        nb_info["lang_name"] = data["metadata"]["language_info"]["name"]
+                    if "version" in lang_keys and "colab" not in metadata_keys:
+                        nb_info["lang_version"] = data["metadata"]["language_info"]["version"]
+
+                elif "language" in metadata_keys:
+                    nb_info["lang_name"] = data["metadata"]["language"]
+
+            
+            # Get information about individual cells.
+            cells_info = {}
+            if "cells" in keys:
+                nb_info["num_cells"] = len(data["cells"]) 
+                cell_id = 0                
+                for cell in data["cells"]:
+                    cell_info, nb_language = get_single_cell(cell_id, file_name, cell, nb_info["lang_name"])
+                    
+                    if nb_info["lang_name"] == "":
+                        nb_info["lang_name"] = nb_language.lower()
+                    
+                    if (file_name, cell_id) not in cells_info:
+                        cells_info[(file_name, cell_id)] = cell_info
+                    
+                    cell_id += 1
+                
+            elif "worksheets" in keys:
+                cell_id = 0
+                for w in data["worksheets"]:
+                    for cell in w["cells"]:
+                        cell_info, nb_language = get_single_cell(cell_id, file_name, cell, nb_info["lang_name"])
+                        
+                        if nb_info["lang_name"] == "":
+                            nb_info["lang_name"] = nb_language.lower()
+
+                        if (file_name, cell_id) not in cells_info:
+                            cells_info[(file_name, cell_id)] = cell_info
+                        
+                        cell_id += 1
+                
+            all_cells_info.update(cells_info)
+    
             if file_name not in new_nb_info:
                 new_nb_info[file_name]= nb_info
 

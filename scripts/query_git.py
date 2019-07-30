@@ -96,7 +96,7 @@ def main():
         # Double check update with user (this takes a long time).
         sure = input((
             "Would you like to update the corpus (i.e. "
-            + "search for recently added notebooks)? "
+            + "search for notebooks added or updated since last search)? "
             + "This may take a while. [y/n]: "
         ))
         if (
@@ -258,6 +258,25 @@ def get_json(
     
     return num_needed
 
+def get_min(filename):
+    """
+    Isolate the minimum search size from a file name.
+
+    Example
+    input: github_notebooks_200..203_p3.json
+    output: 200
+    """
+    return int(filename.split("_")[2].split("..")[0])
+
+def get_max(filename):
+    """
+    Isolate the maximum search size from a file name.
+
+    Example
+    input: github_notebooks_200..203_p3.json
+    output: 203
+    """
+    return int(filename.split("_")[2].split("..")[1])
 
 def edit_size(current_files, minimum, maximum):
     """
@@ -270,15 +289,16 @@ def edit_size(current_files, minimum, maximum):
     been queried returns 0 - 22.
     """
     # Find sizes already queried.
+    # Sort by minimum size.
     sizes_done = {}
     current_files = sorted(
         current_files, 
-        key = lambda x: int(x.split("_")[2].split("..")[0]), 
+        key = get_min, 
     )
-    for x in current_files:
-        start = int(x.split("_")[2].split("..")[0])
-        if ".." in x:
-            end = int(x.split("_")[2].split("..")[1])
+    for filename in current_files:
+        start = get_min(filename)
+        if ".." in filename:
+            end = get_max(filename)
         else:
             end = start
 

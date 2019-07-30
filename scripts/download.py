@@ -63,8 +63,7 @@ def main():
 
     # If both flags are specified, ignore.
     if only_repos and only_nbs:
-        only_repos = False
-        only_nbs = False
+        raise Exception("Cannot use both --repos and --notebooks flags. Use --help flag for more information.")
 
     # If a worker was specified, get partition data and correct header.
     if worker != None:
@@ -77,14 +76,13 @@ def main():
             else:
                 obj = s3.Object("notebook-research", "download_partitions.pickle")
                 partitions_download = pickle.load(BytesIO(obj.get()["Body"].read()))
-        except Exception as e:
+        except Exception:
             print((
                 "Download Partitions data were not found {0}. ".format(
                     "locally" if local else "in s3"
                 )
                 + "Please run parallelize_download.py and try again."
             ))
-            print('Exception:',e)
             sys.exit(0)
         
         partition = partitions_download[worker]
@@ -129,7 +127,7 @@ def main():
     )
 
     if local:
-        current_files = os.listdir("../data/notebooks")
+        current_files = set(os.listdir("../data/notebooks"))
     else:
         obj = s3.Object("notebook-research", "current_notebooks.pickle")
         current_files = pickle.load(BytesIO(obj.get()["Body"].read()))
@@ -137,7 +135,6 @@ def main():
     num_done = len(current_files)
     debug_print(
         "{0} notebooks have already been downloaded.".format(num_done)
-        + "{0} notebooks to download.".format(len(notebooks1) - num_done)
     )
 
     # Download full notebooks from github.
