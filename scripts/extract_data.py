@@ -51,18 +51,20 @@ def main():
     local = args.local
     worker = args.worker
 
+    # If running in parallel, mark csv files with the worker number.
     global EXTENSION 
     EXTENSION = '_{0}'.format(worker) if worker != None else ''
     print('EXTENSION', EXTENSION)
 
     start = datetime.datetime.now()
 
+    # List of saved CSV files.
     if local:
         current_csvs = set(os.listdir(PATH))
     else:
         current_csvs = list_s3_dir("csv/")
 
-    # Extract basic data from json files (files created in query_git.py).
+    # Open basic data from json files (files created in query_git.py).
     if set([
         "notebooks1{0}.csv".format(EXTENSION),
         "repos1{0}.csv".format(EXTENSION),
@@ -78,6 +80,7 @@ def main():
     debug_print("Notebooks1, Owners1, and Repos1 were found and opened."+BREAK)
 
     ## Add information for repositories and owners. ##################
+    save = False
     if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
         owners2, repos2 = update_owners_repos(owners1, repos1, local)
         save = True
@@ -100,23 +103,27 @@ def main():
 
         # If there are new notebooks, update owners and repos.
         if len(owners1_new) > 0:
+            # Extract data for new notebooks.
             owners2_new, repos2_new = update_owners_repos(owners1_new, repos1_new, local)
             
             debug_print("Data collected for {0} owners and {1} repos".format(
                 len(owners2_new), len(repos2_new)
             ))
 
+            # Save new data in case of MemoryError.
             df_to_s3(owners2_new, "csv/owners2_{0}temp.csv".format(EXTENSION))
             df_to_s3(repos2_new, "csv/repos2_{0}temp.csv".format(EXTENSION))
             print("Saved temporary csvs for {0} owners and {1} repos.".format(len(owners2_new), len(repos2_new)))
 
+            # Combine new and old data.
             owners2 = pd.concat([owners2_old, owners2_new], sort = True)
             repos2 = pd.concat([repos2_old, repos2_new], sort = True)
             save = True
+        
+        # Otherwise, no new data.
         else:
             owners2 = owners2_old
             repos2 = repos2_old
-            save = False
     
     # If new data, save.
     if save:
@@ -134,6 +141,7 @@ def main():
     debug_print("Repos2 was found and opened.\n"+BREAK)        
     
     ### Add information on readmes for each repo. #####################
+    save = False
     if not set(["readmes1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
         readmes1 = clean_readmes(repos2, local)
         save = True
@@ -159,15 +167,21 @@ def main():
 
         # If there are new notebooks, clean readmes.
         if len(repos2_new) > 0:
+            # Extract new data.
             readmes1_new = clean_readmes(repos2_new, local)
             print("Collected data for {0} readmes.".format(
                 len(readmes1_new)
             ))
+
+            # Combine new and old data.
             if len(readmes1_old) > 0:
                 readmes1 = pd.concat([readmes1_old, readmes1_new], sort = True) 
             else:
                 readmes1 = readmes1_new
+
             save = True
+        
+        # Otherwise, no new data.
         else:
             readmes1 = readmes1_old
 
@@ -184,6 +198,7 @@ def main():
         debug_print("Readmes1 was created and saved.\n"+BREAK)
 
     ### Add data on cells within each notebook. #######################
+    save = False
     if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
         notebooks2, cells1 = add_nb_cells(notebooks1, local)
         save = True
@@ -227,7 +242,6 @@ def main():
         else:
             notebooks2 = notebooks2_old
             cells1 = cells1_old
-            save = False
 
     # If new data, save.
     if save:
@@ -244,19 +258,22 @@ def main():
     
     ### Remove notebooks and associated cells, repos, readmes,  #######
     ## and owners with incomplete data.                        #######
-    if not set(["notebooks3.csv", "cells2.csv", "repos3.csv"]).issubset(current_csvs):
-        remove_incomplete(notebooks2, cells1, repos2, local)
+    remove_incomplete(notebooks2, cells1, repos2, local)
     
     # Check time and report status.
     end = datetime.datetime.now()
     debug_print("TOTAL TIME: {0}".format(end - start))
 
+
 def get_df(file_name, local):
+    """ Returns specified DataFrame from local storage or S3 """
+
     if local:
         df = pd.read_csv("{0}/{1}".format(PATH, file_name))
     else:
         df = s3_to_df("csv/{0}".format(file_name))
     return df
+
 
 # Equivalent to 5_repo_metadata_cleaning.ipynb
 def update_owners_repos(owners, repos, local):
@@ -452,10 +469,13 @@ def get_all_nb_cells(notebooks, local):
         if count % COUNT_TRIGGER == 0:
             print("{0} / {1} notebooks processed for cell data".format(count, len(notebooks)))
             
+            # Save data and reset. (In chunks to avoid MemoryError).
             if count > 0:
+                # Transform data to DataFrame.
                 notebooks_temp = pd.DataFrame(new_nb_info).transpose()
                 cells_temp = pd.DataFrame(all_cells_info).transpose().reset_index(drop=True)
 
+                # Save data to CSV.
                 try:
                     if local:
                         notebooks_temp.to_csv("{0}/notebooks2_{1}_{2}.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
@@ -464,13 +484,14 @@ def get_all_nb_cells(notebooks, local):
                         df_to_s3(notebooks_temp, "csv/notebooks2_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(cells_temp, "csv/cells1_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
-                except:
+                except MemoryError:
+                    # Split data into 3 sections and try saving again.
                     n1 = notebooks_temp.iloc[:len(notebooks_temp)//3]
                     n2 = notebooks_temp.iloc[len(notebooks_temp)//3:2*len(notebooks_temp)//3]
                     n3 = notebooks_temp.iloc[2*len(notebooks_temp)//3:]
                     c1 = cells_temp.iloc[:len(cells_temp)//3]
                     c2 = cells_temp.iloc[len(cells_temp)//3:2*len(cells_temp)//3]
-                    c3 = cells_temp.iloc[2*len(cells_temp)//3]
+                    c3 = cells_temp.iloc[2*len(cells_temp)//3:]
                     if local:
                         n1.to_csv("{0}/notebooks2_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         n2.to_csv("{0}/notebooks2_{1}_{2}_2.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
@@ -486,11 +507,26 @@ def get_all_nb_cells(notebooks, local):
                         df_to_s3(c2, "csv/cells1_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(c3, "csv/cells1_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
+                # Empty current dictionaries.
                 new_nb_info = {}
                 all_cells_info = {}
                 print("CSVs saved")
 
         date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+
+        # Initialize row of data.
+        nb_info = {
+            "file": file_name,
+            "nbformat": "",
+            "nbformat_minor": "",
+            "num_cells": 0,
+            "kernel_lang": "",
+            "kernel_name": "",
+            "lang_name": "",
+            "lang_version": ""
+        }
+
+        # Open notebooks as json.
         if local:
             try:
                 f = "../data/notebooks/{0}".format(file_name)
@@ -503,16 +539,6 @@ def get_all_nb_cells(notebooks, local):
                 missing.append(file_name)
 
                 # Add row with missing values.
-                nb_info = {
-                    "file": file_name,
-                    "nbformat": "",
-                    "nbformat_minor": "",
-                    "num_cells": 0,
-                    "kernel_lang": "",
-                    "kernel_name": "",
-                    "lang_name": "",
-                    "lang_version": ""
-                }
                 if file_name not in new_nb_info:
                     new_nb_info[file_name]= nb_info
                 
@@ -528,37 +554,14 @@ def get_all_nb_cells(notebooks, local):
                 missing.append(file_name)
                 
                 # Add row with missing values.
-                nb_info = {
-                    "file": file_name,
-                    "nbformat": "",
-                    "nbformat_minor": "",
-                    "num_cells": 0,
-                    "kernel_lang": "",
-                    "kernel_name": "",
-                    "lang_name": "",
-                    "lang_version": ""
-                }
                 if file_name not in new_nb_info:
                     new_nb_info[file_name]= nb_info
                 
                 continue
-        if data:
-            if isinstance(data, dict): 
-                keys = data.keys()
-            else:
-                keys = []
 
-            # Initialize row of data.
-            nb_info = {
-                "file": file_name,
-                "nbformat": "",
-                "nbformat_minor": "",
-                "num_cells": 0,
-                "kernel_lang": "",
-                "kernel_name": "",
-                "lang_name": "",
-                "lang_version": ""
-            }
+        # If data was able to load as JSON, extract information.
+        if data and isinstance(data, dict):
+            keys = data.keys()
             
             # Get nb top level format metadata.
             if "nbformat" in keys:
@@ -567,16 +570,27 @@ def get_all_nb_cells(notebooks, local):
                 nb_info["nbformat_minor"] = data["nbformat_minor"]
             
             # Get info from the metadata dictionary.
-            if "metadata" in keys and type(data["metadata"])!=list and data["metadata"] != None:
+            if (
+                "metadata" in keys 
+                and data["metadata"] != None
+                and isinstance(data["metadata"], dict)
+            ):
                 metadata_keys = data["metadata"].keys()
 
                 # Access language data.
-                if "kernelspec" in metadata_keys and data["metadata"]["kernelspec"] != None:
+                if (
+                    "kernelspec" in metadata_keys 
+                    and data["metadata"]["kernelspec"] != None
+                    and isinstance(data["metadata"]["kernelspec"], dict)
+                ):
                     kernel_keys = data["metadata"]["kernelspec"].keys()
                     
-                    # If google colab notebook, only Python 2.7 or 3.6 are possible.
+                    # If Google colab notebook, only Python 2.7 or 3.6 are possible.
                     if "colab" in metadata_keys:
-                        if "name" in kernel_keys:
+                        if (
+                            "name" in kernel_keys 
+                            and "display_name" in kernel_keys
+                        ):
                             nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["name"]
                             nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
                             if nb_info["kernel_lang"] == "python3":
@@ -586,19 +600,23 @@ def get_all_nb_cells(notebooks, local):
                                 nb_info["lang_name"] = "python"
                                 nb_info["lang_version"] = "2.7"
 
+                    # Not Google colab, access kernel language and display name.
                     else:
                         if "language" in kernel_keys:
                             nb_info["kernel_lang"] = data["metadata"]["kernelspec"]["language"]
                         if "display_name" in kernel_keys:
                             nb_info["kernel_name"] = data["metadata"]["kernelspec"]["display_name"]
 
-                if "language_info" in metadata_keys and "colab" not in metadata_keys:
+                # Access language info.
+                if (
+                    "language_info" in metadata_keys 
+                    and "colab" not in metadata_keys
+                ):
                     lang_keys = data["metadata"]["language_info"].keys()
                     if "name" in lang_keys and "colab" not in metadata_keys:
                         nb_info["lang_name"] = data["metadata"]["language_info"]["name"]
                     if "version" in lang_keys and "colab" not in metadata_keys:
                         nb_info["lang_version"] = data["metadata"]["language_info"]["version"]
-
                 elif "language" in metadata_keys:
                     nb_info["lang_name"] = data["metadata"]["language"]
 
@@ -633,10 +651,10 @@ def get_all_nb_cells(notebooks, local):
                         
                         cell_id += 1
                 
-            all_cells_info.update(cells_info)
-    
-            if file_name not in new_nb_info:
-                new_nb_info[file_name]= nb_info
+        all_cells_info.update(cells_info)
+
+        if file_name not in new_nb_info:
+            new_nb_info[file_name]= nb_info
 
     debug_print("{0} notebooks are missing cell data.".format(len(missing)))
     return new_nb_info, all_cells_info
