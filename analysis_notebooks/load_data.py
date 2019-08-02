@@ -10,28 +10,29 @@ bucket = s3.Bucket("notebook-research")
 
 def load_owners():
     df = s3_to_df('data_final/owners.csv')
-    if df == None:
+    try:
+        return df.reset_index(drop=True)
+   
+    except Exception:
         print('Could not open owners.csv')
         return None
-    else:
-        return df.reset_index(drop=True)
+        
 
 def load_notebooks(sample = 1):
     df = s3_to_df('data_final/notebooks.csv')
-    if df == None:
-        print('Could not open notebooks.csv')
-        return None
-    else:
+    try:
         return df.reset_index(drop=True)
+    except Exception:
+        print('Could not open notebooks.csv')
+        return None        
 
 def load_repos(sample = 1):
     df = s3_to_df('data_final/repos.csv')
-    if df == None:
+    try:
+        return df.reset_index(drop=True)
+    except Exception:
         print('Could not open repos.csv')
         return None
-    else:
-        return df.reset_index(drop=True)
-    
 
 def load_cells(columns=None):
     if columns:
@@ -44,13 +45,13 @@ def load_cells(columns=None):
                 'data_final/cells.csv', 
             )
         
-    if df == None:
-        print('Could not open cells.csv')
-        return None
-    else:
+    try:
         print('Data opened, processing.')
         return process_cells(df.reset_index(drop=True))
-
+    except Exception:
+        print('Could not open cells.csv')
+        return None
+        
 def process_cells(cells):
     def string_to_list(df, column):
         if type(df[column][0]) == str:
