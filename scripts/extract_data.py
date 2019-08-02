@@ -81,7 +81,8 @@ def main():
 
     ## Add information for repositories and owners. ##################
     save = False
-    if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
+    if True:
+    # if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
         owners2, repos2 = update_owners_repos(owners1, repos1, local)
         save = True
     else:
@@ -254,11 +255,6 @@ def main():
         else:
             df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
             df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
-
-    
-    ### Remove notebooks and associated cells, repos, readmes,  #######
-    ## and owners with incomplete data.                        #######
-    remove_incomplete(notebooks2, cells1, repos2, local)
     
     # Check time and report status.
     end = datetime.datetime.now()
@@ -322,7 +318,14 @@ def update_owners_repos(owners, repos, local):
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
                 continue
 
-            owner_id = repo_json["owner"]["id"]                    
+            if "owner" in repo_json:
+                owner_id = repo_json["owner"]["id"]  
+            else:
+                # Report missed files.
+                msg = "Repo {0} metadata file did not open.".format(repo_id)
+                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+                continue
+
             if not repo_json["fork"]:   
                 # Add repo info.
                 repo_info = {
@@ -486,26 +489,42 @@ def get_all_nb_cells(notebooks, local):
 
                 except MemoryError:
                     # Split data into 3 sections and try saving again.
-                    n1 = notebooks_temp.iloc[:len(notebooks_temp)//3]
-                    n2 = notebooks_temp.iloc[len(notebooks_temp)//3:2*len(notebooks_temp)//3]
-                    n3 = notebooks_temp.iloc[2*len(notebooks_temp)//3:]
-                    c1 = cells_temp.iloc[:len(cells_temp)//3]
-                    c2 = cells_temp.iloc[len(cells_temp)//3:2*len(cells_temp)//3]
-                    c3 = cells_temp.iloc[2*len(cells_temp)//3:]
+                    n1 = notebooks_temp.iloc[:len(notebooks_temp)//4]
+                    n2 = notebooks_temp.iloc[len(notebooks_temp)//4:2*len(notebooks_temp)//4]
+                    n3 = notebooks_temp.iloc[2*len(notebooks_temp)//4:3*len(notebooks_temp)//4]
+                    n4 = notebooks_temp.iloc[3*len(notebooks_temp)//4:]
+                    
+                    c1 = cells_temp.iloc[:len(cells_temp)//6]
+                    c2 = cells_temp.iloc[len(cells_temp)//6:2*len(cells_temp)//6]
+                    c3 = cells_temp.iloc[2*len(cells_temp)//6:3*len(cells_temp)//6]
+                    c4 = cells_temp.iloc[3*len(cells_temp)//6:4*len(cells_temp)//6]
+                    c5 = cells_temp.iloc[4*len(cells_temp)//6:5*len(cells_temp)//6]
+                    c6 = cells_temp.iloc[5*len(cells_temp)//6:]
+                    
                     if local:
                         n1.to_csv("{0}/notebooks2_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         n2.to_csv("{0}/notebooks2_{1}_{2}_2.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         n3.to_csv("{0}/notebooks2_{1}_{2}_3.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        n4.to_csv("{0}/notebooks2_{1}_{2}_4.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        
                         c1.to_csv("{0}/cells1_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         c2.to_csv("{0}/cells1_{1}_{2}_2.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         c3.to_csv("{0}/cells1_{1}_{2}_3.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c4.to_csv("{0}/cells1_{1}_{2}_4.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c5.to_csv("{0}/cells1_{1}_{2}_5.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c6.to_csv("{0}/cells1_{1}_{2}_6.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                     else:
                         df_to_s3(n1, "csv/notebooks2_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(n2, "csv/notebooks2_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(n3, "csv/notebooks2_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n4, "csv/notebooks2_{0}_{1}_4.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        
                         df_to_s3(c1, "csv/cells1_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(c2, "csv/cells1_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(c3, "csv/cells1_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c4, "csv/cells1_{0}_{1}_4.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c5, "csv/cells1_{0}_{1}_5.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c6, "csv/cells1_{0}_{1}_6.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
                 # Empty current dictionaries.
                 new_nb_info = {}
@@ -1031,43 +1050,6 @@ def parse_ju(cell_info):
             cell_info["comments"].append(" ".join(l.split("#")[1:]).strip())
 
     return cell_info
-
-def remove_incomplete(notebooks, cells, repos, local):
-    """ Clean data to exclude incomplete results. """
     
-    nbs_w_file = set(notebooks.file)
-    
-    df_nb_content_count = cells[["file", "lines_of_code", "num_words"]].groupby("file").sum().reset_index()
-    nbs_w_cells = set(df_nb_content_count[np.logical_or(
-            df_nb_content_count.lines_of_code != 0,
-            df_nb_content_count.num_words != 0
-        )].file.unique())
-    debug_print("{0} out of the {1} downloaded notebooks have missing cell content.".format(len(notebooks) - len(nbs_w_cells), len(notebooks)))
-    
-    # repos_w_metadata = set(repos.repo_id.unique())
-    # nbs_w_repo = set(notebooks[notebooks.repo_id.isin(repos_w_metadata)]["file"])
-    # debug_print("{0} out of the {1} downloaded notebooks have missing repos.".format(len(notebooks) - len(nbs_w_repo), len(notebooks)))
-
-    nbs_w_all = nbs_w_cells.intersection(nbs_w_file)
-        
-    updated_notebooks = notebooks[notebooks.file.isin(nbs_w_all)]
-    updated_notebooks2 = updated_notebooks[["ipynb_checkpoints" not in n for n in updated_notebooks.file]]
-
-    debug_print("{0} out of the {1} notebooks with full data are part of ipynb_checkpoints.".format(len(updated_notebooks) - len(updated_notebooks2), len(updated_notebooks)))
-
-    updated_repos = repos[repos.repo_id.isin(updated_notebooks2.repo_id)]
-    updated_cells = cells[cells.file.isin(nbs_w_all)]
-    debug_print("\n{0} out of the {1} downloaded notebooks have all data. {2}% of notebooks had missing data and have been deleted.".format(len(updated_notebooks2), len(notebooks), round(100*(1 - len(updated_notebooks2)/len(notebooks)),3)))
-    
-
-    if local:
-        updated_notebooks2.to_csv("{0}/notebooks3{1}.csv".format(PATH, EXTENSION), index = False)
-        updated_cells.to_csv("{0}/cells2{1}.csv".format(PATH, EXTENSION), index = False)
-        updated_repos.to_csv("{0}/repos3{1}.csv".format(PATH, EXTENSION), index = False)
-    else:
-        df_to_s3(updated_notebooks2, "csv/notebooks3{0}.csv".format(EXTENSION))
-        df_to_s3(updated_cells, "csv/cells2{0}.csv".format(EXTENSION))
-        df_to_s3(updated_repos, "csv/repos3{0}.csv".format(EXTENSION))
-        
 if __name__ == "__main__":
     main()

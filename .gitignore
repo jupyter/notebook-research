@@ -6,6 +6,10 @@ analysis_notebooks/11*
 analysis_notebooks/Basics.ipynb
 analysis_notebooks/Features.ipynb
 analysis_notebooks/.DS_Store
+analysis_notebooks/data 
+analysis_notebooks/data_final
+analysis_notebooks/edu_repo_ids.csv
+analysis_notebooks/non_edu_repo_ids.csv
 scripts/__pycache__
 scripts/check_queries.py
 scripts/download_partitions.pickle
@@ -13,6 +17,7 @@ scripts/test.py
 scripts/parallelize*
 scripts/convert.py
 *Untitled*.ipynb
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
