@@ -330,13 +330,11 @@ def update_owners_repos(owners, repos, local):
                 # Add repo info.
                 repo_info = {
                     "repo_id": repo_id,
-                    "fork": repo_json["fork"],
                     "language": repo_json["language"],
                     "forks_count": repo_json["forks_count"],
                     "stargazers_count": repo_json["stargazers_count"],
                     "watchers_count": repo_json["watchers_count"],
                     "subscribers_count": repo_json["subscribers_count"],
-                    "network_count": repo_json["network_count"],
                     "size": repo_json["size"],
                     "open_issues_count": repo_json["open_issues_count"],
                     "has_issues": repo_json["has_issues"],
