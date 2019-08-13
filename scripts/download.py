@@ -45,7 +45,7 @@ def main():
     )
     parser.add_argument("-r","--repos", action="store_const", 
         dest="only_repos", const=True, default=False, 
-        help="Download repos and readmes only."
+        help="Download repos only."
     )
     parser.add_argument("-n","--notebooks", action="store_const", 
         dest="only_nbs", const=True, default=False, 
@@ -71,7 +71,7 @@ def main():
         
         try:
             if local:
-                with open("download_partitions_{0}.pickle".format(worker), "rb") as f:
+                with open("download_partitions.pickle", "rb") as f:
                     partitions_download = pickle.load(f)
             else:
                 obj = s3.Object("notebook-research", "download_partitions.pickle")
@@ -87,8 +87,16 @@ def main():
         
         partition = partitions_download[worker]
         notebooks1 = partition["notebooks"]
-        owners1 = partition["owners"]
-        repos1 = partition["repos"]
+
+        obj = s3.Object("notebook-research", "csv/owners1.csv")
+        owners = pd.read_csv(BytesIO(obj.get()["Body"].read()))
+
+        obj = s3.Object("notebook-research", "csv/repos1.csv")
+        repos = pd.read_csv(BytesIO(obj.get()["Body"].read()))
+
+
+        owners1 = notebooks1[["owner_id"]].merge(owners[['owner_id','owner_login']], on = "owner_id", how = 'left').drop_duplicates()
+        repos1 = notebooks1[["repo_id", 'owner_id']].merge(repos[['repo_id','repo_name']], on = 'repo_id', how = 'left').drop_duplicates()
         header = HEADERS[partition["id"]]
 
         debug_print(
@@ -119,26 +127,26 @@ def main():
 
 
     # Check time and display status.
-    print("{0} notebooks".format(len(notebooks1)))
+    print("{0} notebooks, {1} repos, {2} owners".format(len(notebooks1), len(repos1), len(owners1)))
     check1 = datetime.datetime.now()
     write_to_log(
         "../logs/timing.txt", 
         "download CHECKPOINT 1: {0}".format(check1)
     )
 
-    if local:
-        current_files = set(os.listdir("../data/notebooks"))
-    else:
-        obj = s3.Object("notebook-research", "current_notebooks.pickle")
-        current_files = pickle.load(BytesIO(obj.get()["Body"].read()))
-    
-    num_done = len(current_files)
-    debug_print(
-        "{0} notebooks have already been downloaded.".format(num_done)
-    )
-
     # Download full notebooks from github.
     if not only_repos:
+        if local:
+            current_files = set(os.listdir("../data/notebooks"))
+        else:
+            obj = s3.Object("notebook-research", "current_notebooks.pickle")
+            current_files = pickle.load(BytesIO(obj.get()["Body"].read()))
+        
+        num_done = len(current_files)
+        debug_print(
+            "{0} notebooks have already been downloaded.".format(num_done)
+        )
+        
         download_nbs(notebooks1, local, current_files)
         check2 = datetime.datetime.now()
         write_to_log("../logs/timing.txt", "CHECKPOINT 2: {0}".format(check2))
@@ -147,15 +155,13 @@ def main():
             check2 - check1, BREAK
         ))
        
-    # Download readmes and repo data from github.
+    # Download data from github.
     if not only_nbs:
-        repos1 = repos1[repos1.repo_id.isin(notebooks1.repo_id.values)]
-        owners1 = owners1[owners1.owner_id.isin(notebooks1.owner_id.values)]
-        download_repo_readme_data(repos1, owners1, header, local)
+        download_repo_data(repos1, owners1, header, local)
         check3 = datetime.datetime.now()
         write_to_log("../logs/timing.txt", "CHECKPOINT 3: {0}".format(check3))
         debug_print(
-            "\nReadmes and repos have been downloaded. "+
+            "\nRepos have been downloaded. "+
             "Time: {0}{1}".format(check3 - check2, BREAK)
         )
 
@@ -229,31 +235,27 @@ def download_nbs(notebooks, local, current_files):
     )
 
 
-def download_repo_readme_data(repos, owners, header, local):
-    """ Download repository metadata and readme files from GitHub. """
+def download_repo_data(repos, owners, header, local):
+    """ Download repository metadata files from GitHub. """
     if len(repos) == 0 or len(owners) == 0:
         return
     
     data_frame = repos.merge(owners, on ="owner_id")
 
     # List files already downloaded.
-    if local:
-        current_repos = os.listdir("../data/repos")
-        current_readmes = os.listdir("../data/readmes")
-    else:
-        current_repos = list_s3_dir("repos/")
-        current_readmes = list_s3_dir("readmes/")
+    current_repos = os.listdir("../data/repos") if local else list_s3_dir("repos/")
 
     debug_print((
-        "There are currently {0} repo metadata files "
-        + "saved and {1} readmes saved."
-    ).format(len(current_repos), len(current_readmes)))
+        "There are currently {0} repo metadata files saved."
+    ).format(len(current_repos)))
     
+    num_recorded_since = 0
+
     for i, row in data_frame.iterrows():
         
         # Keep track of the download progress.
         if i % COUNT_TRIGGER == 0 or i == len(data_frame):
-            debug_print("{0} / {1} repos & readmes downloaded.".format(
+            debug_print("{0} / {1} repos downloaded.".format(
                 i, len(data_frame)
             ))
 
@@ -264,11 +266,11 @@ def download_repo_readme_data(repos, owners, header, local):
             while not repo_recorded:
                 time.sleep(wait_time)
                 date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
+                url = "https://api.github.com/repos/{0}/{1}".format(
+                    row["owner_login"], row["repo_name"]
+                )
                 try:
                     # Query the api.
-                    url = "https://api.github.com/repos/{0}/{1}".format(
-                        row["owner_login"], row["repo_name"]
-                    )
                     r = requests.get(url, headers = header)
                     j = r.json()
                     h = r.headers
@@ -276,21 +278,29 @@ def download_repo_readme_data(repos, owners, header, local):
                     # Handle rate limiting.
                     if h["Status"] == "403 Forbidden":
                         debug_print(
-                            "{0}: Hit rate limit. Retry at {1}".format(
-                                h["Date"], time.ctime(int(h["X-RateLimit-Reset"]))
+                            "{0}: Hit rate limit. Retry at {1}. {2} saved since last hit.".format(
+                                h["Date"], time.ctime(int(h["X-RateLimit-Reset"])), num_recorded_since
                             )
                         )
                         wait_time = int(h["X-RateLimit-Reset"]) - time.time() + 1
+                        num_recorded_since = 0
                         continue
                    
+                    if "message" in j and (
+                        j["message"] == "Not Found" or
+                        j["message"] == "Bad credentials"
+                    ):
+                        print(url,'Message:', j['message'])
+                        raise Exception
+
                     # Save JSON File.
                     else:
                         if local:
                             filename = "../data/repos/repo_{0}.json".format(
                                 row["repo_id"]
                             )
-                            with open(filename, "w") as readme_file:
-                                json.dump(j, readme_file)
+                            with open(filename, "w") as repo_file:
+                                json.dump(j, repo_file)
                         else:
                             obj = s3.Object(
                                 "notebook-research",
@@ -299,79 +309,23 @@ def download_repo_readme_data(repos, owners, header, local):
                             obj.put(Body = bytes(json.dumps(j).encode("UTF-8")))
 
                         # Report Status.
-                        msg = "{0}: downloaded readme for repo {1}".format(
+                        msg = "{0}: downloaded repo {1}".format(
                             date_string, row["repo_id"]
                         )
                         write_to_log("../logs/repo_metadata_query_log.txt", msg)
                         repo_recorded = True
                         wait_time = 0
+                        num_recorded_since += 1
 
-                except Exception:
+                except Exception as e:
                     # Report missed files.
-                    msg = "{0}: had trouble downloading readme for repo {1}".format(
+                    msg = "{0}: had trouble downloading repo {1}".format(
                         date_string, row["repo_id"]
                     )
                     write_to_log("../logs/repo_metadata_query_log.txt", msg)
                     debug_print(msg)
+                    debug_print(e)
                     repo_recorded = True
-
-        # Download ReadMe file.
-        readme_recorded = False
-        if "readme_{0}.json".format(row["repo_id"]) not in current_readmes:            
-            wait_time = 0        
-            while not readme_recorded:
-                time.sleep(wait_time)
-                date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
-                try:
-                    # Query the api.
-                    url = "https://api.github.com/repos/{0}/{1}/readme".format(
-                        row["owner_login"], row["repo_name"]
-                    )
-                    r = requests.get(url, headers = header)
-                    j = r.json()
-                    h = r.headers
-
-                    # Handle rate limiting.
-                    if h["Status"] == "403 Forbidden":
-                        debug_print("{0}: Hit rate limit. Retry at {1}".format(
-                            h["Date"], time.ctime(int(h["X-RateLimit-Reset"]))
-                        ))
-                        wait_time = int(h["X-RateLimit-Reset"]) - time.time() + 1
-                        continue
-                    
-                    # Save JSON file.
-                    else:
-                        if local:
-                            filename = "../data/readmes/readme_{0}.json".format(
-                                row["repo_id"]
-                            )
-                            with open(filename, "w") as readme_file:
-                                json.dump(j, readme_file)
-                        else:
-                            obj = s3.Object(
-                                "notebook-research",
-                                "repos/readme_{0}.json".format(row["repo_id"])
-                            )
-                            obj.put(Body = bytes(json.dumps(j).encode("UTF-8")))
-
-
-                        # Report status.
-                        msg = "{0}: downloaded readme for repo {1}".format(
-                            date_string, row["repo_id"]
-                        )
-                        write_to_log("../logs/repo_readme_log.txt", msg)
-                        readme_recorded = True
-                        wait_time = 0
-
-                except Exception:
-                    # Report missed files.
-                    msg = "{0}: had trouble downloading readme for repo {1}".format(
-                        date_string, row["repo_id"]
-                    )
-                    write_to_log("../logs/repo_readme_log.txt", msg)
-                    debug_print(msg)
-                    readme_recorded = True
-
 
 if __name__ == "__main__":
     main()

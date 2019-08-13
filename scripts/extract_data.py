@@ -1,7 +1,7 @@
 """
 Script to extract data from downloaded Jupyter notebooks.
 
-Saves important information about notebooks, repos, and readmes
+Saves important information about notebooks and repos
 to CSV files.
 """
 
@@ -79,182 +79,81 @@ def main():
 
     debug_print("Notebooks1, Owners1, and Repos1 were found and opened."+BREAK)
 
-    ## Add information for repositories and owners. ##################
-    save = False
-    if True:
-    # if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
-        owners2, repos2 = update_owners_repos(owners1, repos1, local)
-        save = True
-    else:
-        # Get existing data.
-        owners2_old = get_df("owners2{0}.csv".format(EXTENSION), local)
-        repos2_old = get_df("repos2{0}.csv".format(EXTENSION), local)
-
-        debug_print("Data found and opened for {0} owners and {1} repos".format(
-            len(owners2_old), len(repos2_old)
-        ))
-
-        # Isolate rows that correspond to new notebooks.
-        owners1_new = owners1[~owners1.owner_id.isin(owners2_old)]
-        repos1_new = repos1[~repos1.repo_id.isin(repos2_old)]
-
-        debug_print("Collecting for {0} owners and {1} repos".format(
-            len(owners1_new), len(repos1_new)
-        ))
-
-        # If there are new notebooks, update owners and repos.
-        if len(owners1_new) > 0:
-            # Extract data for new notebooks.
-            owners2_new, repos2_new = update_owners_repos(owners1_new, repos1_new, local)
-            
-            debug_print("Data collected for {0} owners and {1} repos".format(
-                len(owners2_new), len(repos2_new)
-            ))
-
-            # Save new data in case of MemoryError.
-            df_to_s3(owners2_new, "csv/owners2_{0}temp.csv".format(EXTENSION))
-            df_to_s3(repos2_new, "csv/repos2_{0}temp.csv".format(EXTENSION))
-            print("Saved temporary csvs for {0} owners and {1} repos.".format(len(owners2_new), len(repos2_new)))
-
-            # Combine new and old data.
-            owners2 = pd.concat([owners2_old, owners2_new], sort = True)
-            repos2 = pd.concat([repos2_old, repos2_new], sort = True)
-            save = True
-        
-        # Otherwise, no new data.
-        else:
-            owners2 = owners2_old
-            repos2 = repos2_old
+    ### Add information for repositories and owners. ##################
+    owners2, repos2 = update_owners_repos(owners1, repos1, local)
     
-    # If new data, save.
-    if save:
-        debug_print("Saving combined data for {0} owners and {1} repos".format(
-            len(owners2), len(repos2)
-        ))
-        if local:
-            owners2.to_csv("{0}/owners2{1}.csv".format(PATH, EXTENSION), index = False)
-            repos2.to_csv("{0}/repos2{1}.csv".format(PATH, EXTENSION), index = False)
-        else:
-            df_to_s3(owners2, "csv/owners2{0}.csv".format(EXTENSION))
-            df_to_s3(repos2, "csv/repos2{0}.csv".format(EXTENSION))
-        debug_print("Owners2 and Repos2 were created and saved.\n"+BREAK)
+    ## Save
+    debug_print("Saving combined data for {0} owners and {1} repos".format(
+        len(owners2), len(repos2)
+    ))
+    if local:
+        owners2.to_csv("{0}/owners2{1}.csv".format(PATH, EXTENSION), index = False)
+        repos2.to_csv("{0}/repos2{1}.csv".format(PATH, EXTENSION), index = False)
+    else:
+        df_to_s3(owners2, "csv/owners2{0}.csv".format(EXTENSION))
+        df_to_s3(repos2, "csv/repos2{0}.csv".format(EXTENSION))
+    debug_print("Owners2 and Repos2 were created and saved.\n"+BREAK)
     
     debug_print("Repos2 was found and opened.\n"+BREAK)        
     
-    ### Add information on readmes for each repo. #####################
-    save = False
-    if not set(["readmes1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
-        readmes1 = clean_readmes(repos2, local)
-        save = True
-    else:
-        # Get existing data.
-        try:
-            readmes1_old = get_df("readmes1{0}.csv".format(EXTENSION), local)
-            debug_print("Found and opened data for {0} readmes.".format(
-                len(readmes1_old)
-            ))
-        except:
-            readmes1_old = []
-
-        # Isolate rows of repos2 correspoding to new notebooks.
-        if len(readmes1_old) > 0:
-            repos2_new = repos2[~repos2.repo_id.isin(readmes1_old.repo_id)] 
-        else:
-            repos2_new = repos2
-
-        debug_print("Collecting data for readmes on {0} repos.".format(
-            len(repos2_new)
-        ))
-
-        # If there are new notebooks, clean readmes.
-        if len(repos2_new) > 0:
-            # Extract new data.
-            readmes1_new = clean_readmes(repos2_new, local)
-            print("Collected data for {0} readmes.".format(
-                len(readmes1_new)
-            ))
-
-            # Combine new and old data.
-            if len(readmes1_old) > 0:
-                readmes1 = pd.concat([readmes1_old, readmes1_new], sort = True) 
-            else:
-                readmes1 = readmes1_new
-
-            save = True
-        
-        # Otherwise, no new data.
-        else:
-            readmes1 = readmes1_old
-
-    # If new data, save.
-    if save:
-        print("Saving combined data for {0} readmes.".format(
-            len(readmes1)
-        ))
-        if local:
-            readmes1.to_csv("{0}/readmes1{1}.csv".format(PATH, EXTENSION), index = False)
-        else:
-            df_to_s3(readmes1, "csv/readmes1{0}.csv".format(EXTENSION))
-        
-        debug_print("Readmes1 was created and saved.\n"+BREAK)
-
-    ### Add data on cells within each notebook. #######################
-    save = False
-    if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
-        notebooks2, cells1 = add_nb_cells(notebooks1, local)
-        save = True
-    else:
-        # Get existing data.
-        try:
-            notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
-            cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
-            debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
-            len(notebooks2_old), len(cells1_old)
-        ))
-        except:
-            notebooks2_old = []
-            cells1_old = []
+    
+    ## Add data on cells within each notebook. #######################
+    # save = False
+    # if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
+    #     notebooks2, cells1 = add_nb_cells(notebooks1, local)
+    #     save = True
+    # else:
+    #     # Get existing data.
+    #     try:
+    #         notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
+    #         cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
+    #         debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
+    #         len(notebooks2_old), len(cells1_old)
+    #     ))
+    #     except:
+    #         notebooks2_old = []
+    #         cells1_old = []
        
 
-        # Isolate rows of notebooks1 corresponding to new notebooks
-        if len(notebooks2_old) > 0:
-            notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
-        else:
-            notebooks1_new = notebooks1
+    #     # Isolate rows of notebooks1 corresponding to new notebooks
+    #     if len(notebooks2_old) > 0:
+    #         notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
+    #     else:
+    #         notebooks1_new = notebooks1
 
-        debug_print("Collecting data for {1} notebooks.".format(
-            len(notebooks1_new)
-        ))
+    #     debug_print("Collecting data for {0} notebooks.".format(
+    #         len(notebooks1_new)
+    #     ))
 
-        # If there are new notebooks, add cell data
-        if len(notebooks1_new) > 0:
-            notebooks2_new, cells1_new = add_nb_cells(notebooks1_new, local)
+    #     # If there are new notebooks, add cell data
+    #     if len(notebooks1_new) > 0:
+    #         notebooks2_new, cells1_new = add_nb_cells(notebooks1_new, local)
            
-            debug_print("Collected data for {0} notebooks and {1} cells.".format(
-                len(notebooks2_new), len(cells1_new)
-            ))
+    #         debug_print("Collected data for {0} notebooks and {1} cells.".format(
+    #             len(notebooks2_new), len(cells1_new)
+    #         ))
 
-            if len(notebooks2_old) > 0:
-                notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
-            else:
-                notebooks2 = notebooks2_new
-            cells1 = pd.concat([cells1_old, cells1_new], sort = True)
-            save = True
-        else:
-            notebooks2 = notebooks2_old
-            cells1 = cells1_old
+    #         if len(notebooks2_old) > 0:
+    #             notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
+    #         else:
+    #             notebooks2 = notebooks2_new
+    #         cells1 = pd.concat([cells1_old, cells1_new], sort = True)
+    #         save = True
+    #     else:
+    #         notebooks2 = notebooks2_old
+    #         cells1 = cells1_old
 
-    # If new data, save.
-    if save:
-        debug_print("Saving combined data for {0} notebooks and {1} cells".format(
-            len(notebooks2), len(cells1)
-        ))
-        if local:
-            notebooks2.to_csv("{0}/notebooks2{1}.csv".format(PATH, EXTENSION), index = False)
-            cells1.to_csv("{0}/cells1{1}.csv".format(PATH, EXTENSION), index = False)
-        else:
-            df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
-            df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
+    # # If new data, save.
+    # if save:
+    #     debug_print("Saving combined data for {0} notebooks and {1} cells".format(
+    #         len(notebooks2), len(cells1)
+    #     ))
+    #     if local:
+    #         notebooks2.to_csv("{0}/notebooks2{1}.csv".format(PATH, EXTENSION), index = False)
+    #         cells1.to_csv("{0}/cells1{1}.csv".format(PATH, EXTENSION), index = False)
+    #     else:
+    #         df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
+    #         df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
     
     # Check time and report status.
     end = datetime.datetime.now()
@@ -273,13 +172,14 @@ def get_df(file_name, local):
 
 # Equivalent to 5_repo_metadata_cleaning.ipynb
 def update_owners_repos(owners, repos, local):
-    """ Add information on Owners, repos, and Readmes"""
+    """ Add information on Owners and Repos"""
     
     new_repo_info = {}
     new_owner_info = {}
     repo_ids = list(repos.repo_id)
     missing = 0
     forked = 0
+    moved = 0
 
     for i, repo_id in enumerate(repo_ids):
         repo_json = None
@@ -293,7 +193,7 @@ def update_owners_repos(owners, repos, local):
                 with open("../data/repos/repo_{0}.json".format(repo_id), "r") as repo_json_file:
                     repo_json = json.load(repo_json_file)
 
-            except Exception:    
+            except Exception as e:    
                 missing += 1   
                 # Report missed files.
                 msg = "Repo {0} metadata file did not open or could not process.".format(repo_id)
@@ -302,7 +202,8 @@ def update_owners_repos(owners, repos, local):
             try:
                 obj = s3.Object("notebook-research","repos/repo_{0}.json".format(repo_id))
                 repo_json = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-            except Exception:
+            
+            except Exception as e:
                 missing += 1
                 # Report missed files.
                 msg = "Repo {0} metadata did not process.".format(repo_id)
@@ -314,7 +215,20 @@ def update_owners_repos(owners, repos, local):
                 repo_json["message"] == "Bad credentials"
             ):
                 # Report missed files.
-                msg = "Repo {0} metadata file did not open.".format(repo_id)
+                missing += 1
+                msg = "Repo {0} metadata file did not download well.".format(repo_id)
+
+                # Move bad file
+                s3.Object(
+                    'notebook-research',
+                    'repos_bad/repo_{0}.json'.format(repo_id)
+                ).copy_from(CopySource='notebook-research/repos/repo_{0}.json'.format(repo_id))
+                s3.Object(
+                    'notebook-research',
+                    'repos/repo_{0}.json'.format(repo_id)
+                ).delete()
+                moved += 1
+
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
                 continue
 
@@ -322,7 +236,7 @@ def update_owners_repos(owners, repos, local):
                 owner_id = repo_json["owner"]["id"]  
             else:
                 # Report missed files.
-                msg = "Repo {0} metadata file did not open.".format(repo_id)
+                msg = "Repo {0} metadata file not complete.".format(repo_id)
                 write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
                 continue
 
@@ -330,13 +244,11 @@ def update_owners_repos(owners, repos, local):
                 # Add repo info.
                 repo_info = {
                     "repo_id": repo_id,
-                    "fork": repo_json["fork"],
                     "language": repo_json["language"],
                     "forks_count": repo_json["forks_count"],
                     "stargazers_count": repo_json["stargazers_count"],
                     "watchers_count": repo_json["watchers_count"],
                     "subscribers_count": repo_json["subscribers_count"],
-                    "network_count": repo_json["network_count"],
                     "size": repo_json["size"],
                     "open_issues_count": repo_json["open_issues_count"],
                     "has_issues": repo_json["has_issues"],
@@ -359,90 +271,20 @@ def update_owners_repos(owners, repos, local):
                     new_owner_info[owner_id] = owner_info
             else:
                 forked += 1
+        else:
+            missing += 1
 
     # Display status.
     debug_print("We have {0} repos.".format(len(new_repo_info)))
-    debug_print("Couldnt find {0} files.".format(missing))
+    debug_print("Couldn't process {0} files.".format(missing))
     debug_print("{0} were forked.".format(forked))
+    debug_print("{0} files had to be moved".format(moved))
 
     # Translate dictionaries to DataFrames and save to CSV.
     updated_owners = owners.merge(pd.DataFrame(new_owner_info).transpose().reset_index(drop=True), on = "owner_id")
     updated_repos = repos.merge(pd.DataFrame(new_repo_info).transpose().reset_index(drop=True), on = "repo_id")
     
     return updated_owners, updated_repos
-
-def clean_readmes(repos, local):
-    """ Add information on preferred readme for each repo. """
-    
-    readmes = {}
-    if local:
-        repo_ids = set([int(f.split(".")[0].split("_")[1]) for f in os.listdir("../data/readmes") if f[-5:] == ".json"])
-    else:
-        repo_ids = [int(f.split(".")[0].split("_")[1]) for f in list_s3_dir('readmes/')]
-    
-    readme_json = None
-    unprocessed = 0
-    for count, repo_id in enumerate(repo_ids):    
-        # Keep track of progress.
-        if count % COUNT_TRIGGER == 0:
-            debug_print("{0} / {1} repo readme files processed".format(count, len(repo_ids)))
-        
-        if local:
-            try:
-                with open("../data/readmes/readme_{0}.json".format(repo_id), "r") as json_file:
-                    try:
-                        readme_json = json.load(json_file)
-                    except Exception:
-                        unprocessed+=1
-                        msg = "Repo {0} readme did not process".format(repo_id)
-                        write_to_log("../logs/repo_readme_cleaning_log.txt",msg)
-                        
-                        readme = {
-                                "repo_id": repo_id,
-                                "path": "",
-                                "html_url": "",
-                                "content": ""
-                            }
-                        if repo_id not in readmes:
-                            readmes[repo_id] = readme
-            except Exception:
-                debug_print("Did not find readme_{0}.json".format(repo_id))
-        else:
-            try:
-                obj = s3.Object("notebook-research","readmes/readme_{0}.json".format(repo_id))
-                readme_json = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-            except Exception:
-                # Report missed files.
-                msg = "Repo {0} metadata did not process.".format(repo_id)
-                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
-                debug_print(msg)
-                unprocessed += 1
-
-        if readme_json:
-            if "message" in readme_json and (
-                readme_json["message"] == "Not Found" or 
-                readme_json["message"] == "Bad credentials"
-            ):
-                unprocessed += 1
-            else:
-                readme = {
-                    "repo_id": repo_id,
-                    "path": readme_json["path"],
-                    "html_url": readme_json["html_url"],
-                    "content": readme_json["content"]
-                }
-                if repo_id not in readmes:
-                    readmes[repo_id] = readme
-                                        
-                 
-    # Display Status
-    debug_print("We have {0} notebook readmes.".format(len(readmes)))
-    debug_print("{0} repo readmes did not process or were not found.".format(unprocessed))
-
-    # Translate dictionaries to DataFrames and save to CSV.
-    readmes_df = pd.DataFrame(readmes).transpose().reset_index(drop=True)
-
-    return readmes_df
 
 # Equivalent to 6_compute_nb_data.ipynb
 def add_nb_cells(notebooks, local):
@@ -494,12 +336,14 @@ def get_all_nb_cells(notebooks, local):
                     n3 = notebooks_temp.iloc[2*len(notebooks_temp)//4:3*len(notebooks_temp)//4]
                     n4 = notebooks_temp.iloc[3*len(notebooks_temp)//4:]
                     
-                    c1 = cells_temp.iloc[:len(cells_temp)//6]
-                    c2 = cells_temp.iloc[len(cells_temp)//6:2*len(cells_temp)//6]
-                    c3 = cells_temp.iloc[2*len(cells_temp)//6:3*len(cells_temp)//6]
-                    c4 = cells_temp.iloc[3*len(cells_temp)//6:4*len(cells_temp)//6]
-                    c5 = cells_temp.iloc[4*len(cells_temp)//6:5*len(cells_temp)//6]
-                    c6 = cells_temp.iloc[5*len(cells_temp)//6:]
+                    c1 = cells_temp.iloc[:len(cells_temp)//8]
+                    c2 = cells_temp.iloc[len(cells_temp)//8:2*len(cells_temp)//8]
+                    c3 = cells_temp.iloc[2*len(cells_temp)//8:3*len(cells_temp)//8]
+                    c4 = cells_temp.iloc[3*len(cells_temp)//8:4*len(cells_temp)//8]
+                    c5 = cells_temp.iloc[4*len(cells_temp)//8:5*len(cells_temp)//8]
+                    c6 = cells_temp.iloc[5*len(cells_temp)//8:6*len(cells_temp)//8]
+                    c7 = cells_temp.iloc[6*len(cells_temp)//8:7*len(cells_temp)//8]
+                    c8 = cells_temp.iloc[7*len(cells_temp)//8:]
                     
                     if local:
                         n1.to_csv("{0}/notebooks2_{1}_{2}_1.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
@@ -513,6 +357,8 @@ def get_all_nb_cells(notebooks, local):
                         c4.to_csv("{0}/cells1_{1}_{2}_4.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         c5.to_csv("{0}/cells1_{1}_{2}_5.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         c6.to_csv("{0}/cells1_{1}_{2}_6.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c7.to_csv("{0}/cells1_{1}_{2}_7.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
+                        c8.to_csv("{0}/cells1_{1}_{2}_8.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                     else:
                         df_to_s3(n1, "csv/notebooks2_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(n2, "csv/notebooks2_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
@@ -525,6 +371,8 @@ def get_all_nb_cells(notebooks, local):
                         df_to_s3(c4, "csv/cells1_{0}_{1}_4.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(c5, "csv/cells1_{0}_{1}_5.csv".format(EXTENSION, count/COUNT_TRIGGER))
                         df_to_s3(c6, "csv/cells1_{0}_{1}_6.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c7, "csv/cells1_{0}_{1}_7.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c8, "csv/cells1_{0}_{1}_8.csv".format(EXTENSION, count/COUNT_TRIGGER))
 
                 # Empty current dictionaries.
                 new_nb_info = {}
