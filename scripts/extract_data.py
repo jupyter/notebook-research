@@ -98,62 +98,62 @@ def main():
     
     
     ## Add data on cells within each notebook. #######################
-    # save = False
-    # if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
-    #     notebooks2, cells1 = add_nb_cells(notebooks1, local)
-    #     save = True
-    # else:
-    #     # Get existing data.
-    #     try:
-    #         notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
-    #         cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
-    #         debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
-    #         len(notebooks2_old), len(cells1_old)
-    #     ))
-    #     except:
-    #         notebooks2_old = []
-    #         cells1_old = []
+    save = False
+    if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
+        notebooks2, cells1 = add_nb_cells(notebooks1, local)
+        save = True
+    else:
+        # Get existing data.
+        try:
+            notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
+            cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
+            debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
+            len(notebooks2_old), len(cells1_old)
+        ))
+        except:
+            notebooks2_old = []
+            cells1_old = []
        
 
-    #     # Isolate rows of notebooks1 corresponding to new notebooks
-    #     if len(notebooks2_old) > 0:
-    #         notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
-    #     else:
-    #         notebooks1_new = notebooks1
+        # Isolate rows of notebooks1 corresponding to new notebooks
+        if len(notebooks2_old) > 0:
+            notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
+        else:
+            notebooks1_new = notebooks1
 
-    #     debug_print("Collecting data for {0} notebooks.".format(
-    #         len(notebooks1_new)
-    #     ))
+        debug_print("Collecting data for {0} notebooks.".format(
+            len(notebooks1_new)
+        ))
 
-    #     # If there are new notebooks, add cell data
-    #     if len(notebooks1_new) > 0:
-    #         notebooks2_new, cells1_new = add_nb_cells(notebooks1_new, local)
+        # If there are new notebooks, add cell data
+        if len(notebooks1_new) > 0:
+            notebooks2_new, cells1_new = add_nb_cells(notebooks1_new, local)
            
-    #         debug_print("Collected data for {0} notebooks and {1} cells.".format(
-    #             len(notebooks2_new), len(cells1_new)
-    #         ))
+            debug_print("Collected data for {0} notebooks and {1} cells.".format(
+                len(notebooks2_new), len(cells1_new)
+            ))
 
-    #         if len(notebooks2_old) > 0:
-    #             notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
-    #         else:
-    #             notebooks2 = notebooks2_new
-    #         cells1 = pd.concat([cells1_old, cells1_new], sort = True)
-    #         save = True
-    #     else:
-    #         notebooks2 = notebooks2_old
-    #         cells1 = cells1_old
+            if len(notebooks2_old) > 0:
+                notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
+            else:
+                notebooks2 = notebooks2_new
+            cells1 = pd.concat([cells1_old, cells1_new], sort = True)
+            save = True
+        else:
+            notebooks2 = notebooks2_old
+            cells1 = cells1_old
 
-    # # If new data, save.
-    # if save:
-    #     debug_print("Saving combined data for {0} notebooks and {1} cells".format(
-    #         len(notebooks2), len(cells1)
-    #     ))
-    #     if local:
-    #         notebooks2.to_csv("{0}/notebooks2{1}.csv".format(PATH, EXTENSION), index = False)
-    #         cells1.to_csv("{0}/cells1{1}.csv".format(PATH, EXTENSION), index = False)
-    #     else:
-    #         df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
-    #         df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
+    # If new data, save.
+    if save:
+        debug_print("Saving combined data for {0} notebooks and {1} cells".format(
+            len(notebooks2), len(cells1)
+        ))
+        if local:
+            notebooks2.to_csv("{0}/notebooks2{1}.csv".format(PATH, EXTENSION), index = False)
+            cells1.to_csv("{0}/cells1{1}.csv".format(PATH, EXTENSION), index = False)
+        else:
+            df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
+            df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
     
     # Check time and report status.
     end = datetime.datetime.now()
