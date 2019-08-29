@@ -11,18 +11,18 @@ For this research, we narrow our focus to notebooks written in Python. More spec
 ## Functions
 
 
-![](./images/functions_hist.png)
+<img src=./images/functions_hist.png width=400>
 
 *Figure 1: Number of functions, user defined vs not user defined.*
 
 The median number of user defined functions used in a notebook is 0 while the number of not user defined functions is centered at 19. The distribution for not user defined functions is more right-skewed than that for user defined functions.
 
 
-![](./images/call_params.png)
+<img src=./images/call_params.png width=400>
 
 *Figure 2: parameters per function call*
 
-![](./images/def_params.png)
+<img src=./images/def_params.png width=400>
 
 *Figure 3: parameters per function definition*
 
