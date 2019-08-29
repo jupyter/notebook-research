@@ -77,7 +77,3 @@ python3 parallelize_extract.py
 # all at once
 python3 extract_data.py
 ```
-
-### 5. Running Analysis Notebooks
-
-- Notebooks within the `analysis_notebooks` directory can be run only if `extract_data.py` has been run to completion such that final csv files are the the `csv` directory. Further, `aggregations.py` will need to be run to create aggregations for quicker analysis.
