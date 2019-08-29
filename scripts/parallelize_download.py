@@ -66,8 +66,12 @@ def main():
 
     # Format commands.
     download_commands = [
-        ("nohup python3 -u download.py --worker {0}"
-        " > ../output/w{1}-download11.log &").format(i, i) 
+        ("nohup python3 -u download.py --worker {0}{1}"
+        " > download_{2}.log &").format(
+            i, 
+            (' --local' if local else ''),
+            i
+        ) 
         for i in range(NUM_WORKERS)
     ]
 

@@ -27,7 +27,7 @@ def main():
     updating = args.updating
 
     # Load csv with approximated number of notebooks per size interval.
-    data_df = pd.read_csv("../csv/nb_counts.csv")
+    data_df = pd.read_csv("./nb_counts.csv")
 
     # Calculate best size distribution among workers.
     workers = distribute_query(data_df, NUM_WORKERS, MIN, MAX)
@@ -40,7 +40,7 @@ def main():
         size_max = size.split("..")[1]
         if size_min <= size_max:
             query_commands.append(("nohup python3 -u query_git.py {0} {1}"
-                " --worker {2}{3}> ../output/w{4}-16.log &").format(
+                " --worker {2}{3}> query_{4}.log &").format(
                     size_min, size_max, 
                     worker["id"], 
                     " --update " if updating else " ",

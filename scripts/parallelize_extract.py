@@ -60,8 +60,8 @@ def main():
 
     # Format commands.
     extract_commands = [
-        ("nohup python3 -u extract_data.py --worker {0}"
-        " >> ../output/w{1}-extract1.log &").format(i, i) 
+        ("nohup python3 -u extract_data.py --worker {0}{1}"
+        " >> extract_{2}.log &").format(i, ('--local' if local else ''), i) 
         for i in range(10)
     ]
     
