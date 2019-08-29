@@ -9,7 +9,7 @@ The number of notebooks on GitHub has grown dramatically since Rule’s research
 
 I first queried all public, non-forked Jupyter notebooks, then downloaded them and their corresponding repository metadata. There are just over 5 million notebooks on GitHub, and of those, I was able to download 93%. 23% of all notebooks were a part of ipynb_checkpoints, a version control feature of Jupyter that saves the most recent manually-saved versions of notebooks. This allows users to return to that point even if the program has automatically saved the notebook since. Files in ipynb_checkpoints are either exact duplicates or very recent versions of the “real” notebook which is in the same repository. To avoid double-counting these notebooks, I dropped these files from our dataset. I was unable to download repository metadata for 6.6% notebooks. This can be because the repository was deleted, its name was edited, or it was changed to private in the time between querying and downloading, or because there was a problem with the JSON file. Finally, 1% of notebooks that were downloaded were empty and were removed. This leaves us with just over 4.2 million notebooks.
 
-![](./images/use_over_time.png)
+<img src=./images/user_over_time.png width=700>
 
 *Figure 1: Use of Jupyter Notebooks over time.*
 
@@ -27,7 +27,7 @@ There are now 917,535 public repositories on GitHub with at least one Jupyter No
 
 98.3% of notebooks have a specified language, an increase from 85.1% calculated by Rule. The distribution of languages has stayed very similar, all within a percentage point of what was reported in 2017. Looking only at notebooks with specified languages, 97.62% are written in Python. The next most popular languages are Julia and R, making up 0.8% and 0.95% respectively.
 
-![](./images/r_versus_juila.png)
+<img src=./images/r_versus_julia.png width=400>
 
 *Figure 2: R vs Julia over time.*
 
@@ -45,7 +45,7 @@ I then looked more specifically at the imports of machine learning frameworks. T
 
 The majority of notebooks are under 20 kilobytes in size, but notebooks range from 62 bytes and 100 megabytes (GitHub’s file size limit). The median number of cells per notebook is 19 (mean 28.7). 4.0% of notebooks have no code, up from 2.2% in 2017. Among notebooks with code, the median number of lines of code has remained at 86 lines (mean 145.7). 27.8% of notebooks have no markdown text, the exact same as in 2017. Among notebooks with markdown, the median number of words is 194 (mean 550.9). This has gone down since Adam’s research, when a median of 218 words was calculated.
 
-![](./images/content.png)
+<img src=./images/content.png width=600>
 
 *Figure 3: Notebook Content Distributions.*
 
@@ -54,7 +54,7 @@ The majority of notebooks are under 20 kilobytes in size, but notebooks range fr
 
 Adam identified the pattern of notebooks containing more markdown at the beginning and more code at the end. This pattern is still present. I calculated that while 53% of cells within the first 5% of a notebook are markdown, this drops to 26% for the last 5% of a notebook (see Figure 4).
 
-![](./images/markdown_vs_code.png)
+<img src=./images/markdown_vs_code.png width=400>
 
 *Figure 4: Markdown vs code distribution across the notebook.*
 
@@ -67,7 +67,7 @@ But we can change the first cell and re-run it, migrating this notebook to a non
 
  In 2017, Adam looked specifically at the execution order of notebooks with output. I calculated that 84% (compare to 85%) of notebooks have at least one cell with output, and 29% of such notebooks were run out of order. This is a huge decrease since the 43.9% observed in 2017. 
 
-![](./images/execution.png)
+<img src=./images/execution.png width=200>
 
 *Figure 5: Execution order.*
 
