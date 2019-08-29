@@ -29,7 +29,6 @@ The initial collaboration will involve several individuals and institutions:
 - data 
     - json
     - notebooks
-    - readmes
     - repos
 - logs
 - csv

@@ -73,9 +73,10 @@ def main():
             if local:
                 with open("download_partitions.pickle", "rb") as f:
                     partitions_download = pickle.load(f)
+                partition = partitions_download[worker]
             else:
-                obj = s3.Object("notebook-research", "download_partitions.pickle")
-                partitions_download = pickle.load(BytesIO(obj.get()["Body"].read()))
+                obj = s3.Object("notebook-research", "download_partitions_{0}.pickle".format(worker))
+                partition = pickle.load(BytesIO(obj.get()["Body"].read()))
         except Exception:
             print((
                 "Download Partitions data were not found {0}. ".format(
@@ -85,7 +86,6 @@ def main():
             ))
             sys.exit(0)
         
-        partition = partitions_download[worker]
         notebooks1 = partition["notebooks"]
 
         obj = s3.Object("notebook-research", "csv/owners1.csv")
@@ -231,7 +231,7 @@ def download_nbs(notebooks, local, current_files):
         "{0} were already done. {1} were in ipynb checkpoints. {2} ".format(
             already_done, checkpoints, new
         )
-        + "new notebooks were donwloaded."
+        + "new notebooks were downloaded."
     )
 
 
@@ -250,9 +250,12 @@ def download_repo_data(repos, owners, header, local):
     ).format(len(current_repos)))
     
     num_recorded_since = 0
+    num_tried_since = 0
+    hit_url = ''
 
     for i, row in data_frame.iterrows():
-        
+        num_tried_since += 1
+
         # Keep track of the download progress.
         if i % COUNT_TRIGGER == 0 or i == len(data_frame):
             debug_print("{0} / {1} repos downloaded.".format(
@@ -278,12 +281,19 @@ def download_repo_data(repos, owners, header, local):
                     # Handle rate limiting.
                     if h["Status"] == "403 Forbidden":
                         debug_print(
-                            "{0}: Hit rate limit. Retry at {1}. {2} saved since last hit.".format(
-                                h["Date"], time.ctime(int(h["X-RateLimit-Reset"])), num_recorded_since
+                            "{0}: Hit rate limit. Retry at {1}. {2} tried and {3} saved since last hit.".format(
+                                h["Date"], time.ctime(int(h["X-RateLimit-Reset"])), num_tried_since, num_recorded_since
                             )
                         )
+                        if hit_url == url:
+                            print('Same one again, skipping')
+                            repo_recorded = True
+                            continue
+
                         wait_time = int(h["X-RateLimit-Reset"]) - time.time() + 1
+                        num_tried_since = 0
                         num_recorded_since = 0
+                        hit_url = url
                         continue
                    
                     if "message" in j and (

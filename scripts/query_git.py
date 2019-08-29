@@ -31,6 +31,7 @@ from funcs import (
     debug_print,
     write_to_log,
     df_to_s3,
+    s3_to_df,
     list_s3_dir
 )
 
@@ -92,22 +93,13 @@ def main():
     # If updating, look at saved_urls to determine a duplicate.
     # New versions of notebooks will overwrite earlier downloads.
     saved_urls = []
-    if updating:
-        # Double check update with user (this takes a long time).
-        sure = input((
-            "Would you like to update the corpus (i.e. "
-            + "search for notebooks added or updated since last search)? "
-            + "This may take a while. [y/n]: "
-        ))
-        if (
-            sure.lower().strip() == "y" or 
-            sure.lower().strip() == "yes"
-        ):
-            if "notebooks1.csv" in os.listdir(PATH):
-                notebooks1 = pd.read_csv("{0}/notebooks1.csv".format(PATH))
-                saved_urls = list(notebooks1.html_url)
+    current_csvs = os.listdir(PATH) if local else list_s3_dir('csv')
+    if updating and "notebooks1.csv" in current_csvs:
+        if local:
+            notebooks1 = pd.read_csv("{0}/notebooks1.csv".format(PATH))
         else:
-            updating = False
+            notebooks1 = s3_to_df('csv/notebooks1.csv')
+        saved_urls = list(notebooks1.html_url)
 
     # Set worker.
     if worker != None:
@@ -130,10 +122,7 @@ def main():
     )        
 
     # List notebooks already downloaded.
-    current_notebooks = (
-        set(os.listdir("../data/notebooks")) if local 
-        else list_s3_dir("notebooks/")
-    ) if updating else []
+    current_notebooks = set(notebooks1.file) if updating else []
 
     # Get json query files for given size range.
     num_needed = get_json(MIN, MAX, saved_urls, header, 
@@ -151,13 +140,14 @@ def main():
     if process:
         clean_metadata(num_needed, updating, local)
 
+        debug_print(
+            "Notebooks1, Owners1, and Repos1 were created and saved. "
+        )
+    
     # Check time, log, and display status.
     check2 = datetime.datetime.now()
     write_to_log("../logs/timing.txt","CHECKPOINT 2: {0}".format(check2))
-    debug_print(
-        "Notebooks1, Owners1, and Repos1 were created and saved. "
-        + "Time: {0}{1}".format(check2 - check1, BREAK)
-    )
+        
     debug_print("All together, {0}".format(check2 - start))
 
 
@@ -542,7 +532,7 @@ def save_page(
 
         for item in j["items"]:
             # If updating, done if this html_url has already been downloaded.
-            if query_status["updating"]:
+            if query_status["updating"] and "file" in item:
                 html_url = item["html_url"].replace("#","%23")
                 file_name = item["file"]
                 # If the same version of an existing notebook, done.
@@ -593,6 +583,32 @@ def clean_metadata(num_needed, updating, local):
     Extract information from metadata JSON files and save to CSVs. 
     Equivalent to Adam's 1_nb_metadata_cleaning.ipynb.
     """
+
+    try:
+        if local:
+            pass
+        else:
+            notebooks_done = s3_to_df("csv/notebooks1.csv")
+            owners_done = s3_to_df("csv/owners1.csv")
+            repos_done = s3_to_df("csv/repos1.csv")
+
+        notebook_files_done = set(notebooks_done.file)
+        owner_ids_done = set(owners_done.owner_id)
+        repo_ids_done = set(repos_done.repo_id)
+
+        print('Metadata already processed for {0} notebooks, {1} owners, and {2} repos.'.format(
+            len(notebook_files_done),
+            len(owner_ids_done),
+            len(repo_ids_done)
+        ))
+        
+
+    except:
+        notebook_files_done = []
+        owner_ids_done = []
+        repo_ids_done = []
+        
+        print("Metadata not processed for any files.")
 
     # Get all query files.
     if local:
@@ -668,20 +684,21 @@ def clean_metadata(num_needed, updating, local):
                         item["path"]
                     ).replace("/","..")
                 
-                    notebook = {
-                        "file": name,
-                        "html_url": item["html_url"],
-                        "name" : item["name"],
-                        "path": item["path"],
-                        "repo_id": repo_id,
-                        "owner_id": owner_id,
-                        "filesize": filesize,
-                        "query_page": query_page,
-                        "days_since": days_since
-                    }
-                    notebooks[name] = notebook
+                    if name not in notebook_files_done:
+                        notebook = {
+                            "file": name,
+                            "html_url": item["html_url"],
+                            "name" : item["name"],
+                            "path": item["path"],
+                            "repo_id": repo_id,
+                            "owner_id": owner_id,
+                            "filesize": filesize,
+                            "query_page": query_page,
+                            "days_since": days_since
+                        }
+                        notebooks[name] = notebook
 
-                    if repo_id not in repos:
+                    if repo_id not in repos and repo_id not in repo_ids_done:
                         repo = {
                             "repo_name": item_repo["name"],
                             "owner_id": owner_id,
@@ -692,7 +709,7 @@ def clean_metadata(num_needed, updating, local):
                         }
                         repos[repo_id] = repo
 
-                    if owner_id not in owners:
+                    if owner_id not in owners and owner_id not in owner_ids_done:
                         owner = {
                             "owner_html_url": item_repo["owner"]["html_url"],
                             "owner_login": item_repo["owner"]["login"],
@@ -711,7 +728,7 @@ def clean_metadata(num_needed, updating, local):
 
     # Display status
     debug_print(("\nAfter processing all query files, "
-                "we have {0} notebooks.").format(len(notebooks)))
+                "we have {0} new notebooks.").format(len(notebooks)))
     debug_print("Written by {0} owners.".format(len(owners)))
     debug_print("Held in {0} repositories.".format(len(repos)))
 
@@ -731,13 +748,13 @@ def clean_metadata(num_needed, updating, local):
     )
 
     if local:
-        notebooks_df.to_csv("{0}/notebooks1.csv".format(PATH), index = False)
-        owners_df.to_csv("{0}/owners1.csv".format(PATH), index = False)
-        repos_df.to_csv("{0}/repos1.csv".format(PATH), index = False)
+        pd.concat([notebooks_df, notebooks_done]).to_csv("{0}/notebooks1.csv".format(PATH), index = False)
+        pd.concat([owners_df, owners_done]).to_csv("{0}/owners1.csv".format(PATH), index = False)
+        pd.concat([repos_df, repos_done]).to_csv("{0}/repos1.csv".format(PATH), index = False)
     else:
-        df_to_s3(notebooks_df, "csv/notebooks1.csv")
-        df_to_s3(owners_df, "csv/owners1.csv")
-        df_to_s3(repos_df, "csv/repos1.csv")
+        df_to_s3(pd.concat([notebooks_df, notebooks_done]), "csv/notebooks1.csv")
+        df_to_s3(pd.concat([owners_df, owners_done]), "csv/owners1.csv")
+        df_to_s3(pd.concat([repos_df, repos_done]), "csv/repos1.csv")
 
 
 if __name__ == "__main__":

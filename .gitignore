@@ -14,7 +14,6 @@ scripts/__pycache__
 scripts/check_queries.py
 scripts/download_partitions.pickle
 scripts/test.py
-scripts/parallelize*
 scripts/convert.py
 *Untitled*.ipynb
 .DS_Store
