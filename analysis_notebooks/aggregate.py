@@ -4,7 +4,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import datetime
-import func_im_var_order
+
 
 from collections import deque
 import scipy.stats as st
@@ -13,72 +13,72 @@ import astpretty
 import re
 
 def main():
-#     # Used first in Organization.ipynb
-#     print('\nCell Output')
-#     get_cell_output()
-#     print('\nCell Stats')
-#     get_cell_stats()
-#     print('\nCell Order')
-#     get_cell_order()
-#     print('\nCell Types')
-#     get_cell_types()
+    # Used first in Organization.ipynb
+    print('\nCell Output')
+    get_cell_output()
+    print('\nCell Stats')
+    get_cell_stats()
+    print('\nCell Order')
+    get_cell_order()
+    print('\nCell Types')
+    get_cell_types()
     
-#     # Used first in Packages.ipynb
-#     print('\nGet Imports')
-#     get_nb_imports()
-#     print('\nGet Code')
-#     get_nb_code()
+    # Used first in Packages.ipynb
+    print('\nGet Imports')
+    get_nb_imports()
+    print('\nGet Code')
+    get_nb_code()
     
-#     print('\nGetting nb_imports_code_df')
-#     nb_imports_code_df = load_data.load_nb_imports(code = True)
-#     print('\nnb_imports_code_df loaded')
-#     cell_types_df = load_data.load_cell_types()
-#     print('\ncell_types loaded')
-#     cell_stats_df = load_data.load_cell_stats()
-#     print('\ncell_stats loaded')
-#     cell_info_code_df = cell_types_df.merge(
-#         cell_stats_df, on = 'file'
-#     ).merge(
-#         nb_imports_code_df.rename(columns={'code':'code_list'}), on = 'file'
-#     )
-#     print('\ndfs combined')
+    print('\nGetting nb_imports_code_df')
+    nb_imports_code_df = load_data.load_nb_imports(code = True)
+    print('\nnb_imports_code_df loaded')
+    cell_types_df = load_data.load_cell_types()
+    print('\ncell_types loaded')
+    cell_stats_df = load_data.load_cell_stats()
+    print('\ncell_stats loaded')
+    cell_info_code_df = cell_types_df.merge(
+        cell_stats_df, on = 'file'
+    ).merge(
+        nb_imports_code_df.rename(columns={'code':'code_list'}), on = 'file'
+    )
+    print('\ndfs combined')
     
-    # Used first in APIs.ipynb
-#     print('\nGet Objects')
-#     get_all_objects(cell_info_code_df)
-#     print('\nGet Lines Per Code Cell')
-#     get_lines_per_code_cell(cell_info_code_df)
-#     print('\nGet Function Definitions')
-#     get_function_defs(cell_info_code_df)
-#     print('\nGet Function Uses')
-#     get_function_use(cell_info_code_df)
+    #Used first in APIs.ipynb
+    print('\nGet Objects')
+    get_all_objects(cell_info_code_df)
+    print('\nGet Lines Per Code Cell')
+    get_lines_per_code_cell(cell_info_code_df)
+    print('\nGet Function Definitions')
+    get_function_defs(cell_info_code_df)
+    print('\nGet Function Uses')
+    get_function_use(cell_info_code_df)
     print('\nSeparate User-defined functions from not user-defined')
     add_user_funcs()
     
-#     # Used first in Struggles.ipynb
-#     print('\nGet Erros')
-#     get_errors()
-#     print('\nGet Statuses')
-#     func_im_var_order.get_statuses()
+    # Used first in Struggles.ipynb
+    print('\nGet Erros')
+    get_errors()
+    print('\nGet Statuses')
+    get_statuses()
 
     
-   # Used first in Visualizations.ipynb
-#     print('\nGet Visualization Uses')
-#     get_vis_uses(nb_imports_code_df)
-#     print('\nAdd Visualization Uses to Notebooks')
-#     get_vis_uses_nb(nb_imports_code_df)
+    # Used first in Visualizations.ipynb
+    print('\nGet Visualization Uses')
+    get_vis_uses(nb_imports_code_df)
+    print('\nAdd Visualization Uses to Notebooks')
+    get_vis_uses_nb(nb_imports_code_df)
     
-#     # Used first in Models.ipynb
-#     print('\nGet Framework Uses')
-#     get_framework_uses(nb_imports_code_df)
+    # Used first in Models.ipynb
+    print('\nGet Framework Uses')
+    get_framework_uses(nb_imports_code_df)
 
-#     print('\nGet Magic')
-#     get_magic()
+    print('\nGet Magic')
+    get_magic()
     
 
 def get_magic():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, 
         usecols = ['file','cell_id','code'], 
         chunksize = 10000
@@ -133,7 +133,7 @@ def get_magic():
 def get_nb_code():
     start = datetime.datetime.now()
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, usecols = ['file','code','cell_type'], 
         chunksize=10000
     )
@@ -491,7 +491,7 @@ def add_user_funcs():
     
 def get_errors():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, usecols = ['file','num_error','error_names','cell_id'], 
         chunksize=10000
     )
@@ -541,8 +541,8 @@ def get_errors():
     
 
 def get_vis_uses_nb(nb_imports_code_df):
-    notebooks = pd.read_csv('data_final/notebooks.csv')
-    repos = pd.read_csv('data_final/repos.csv')
+    notebooks = pd.read_csv('data_final/notebooks_final.csv')
+    repos = pd.read_csv('data_final/repos_final.csv')
     DATE_CHOICE = 'pushed_at'
     
     vis = ['matplotlib','altair','seaborn',
@@ -672,7 +672,7 @@ def get_framework_uses(nb_imports_code_df):
     
 def get_nb_imports():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, usecols = ['file','imports','cell_id'], 
         chunksize=10000
     )
@@ -732,7 +732,7 @@ def get_nb_imports():
     
 def get_cell_output():
     df_chunks = pd.read_csv(
-    'data_final/cells.csv', 
+    'data_final/cells_final.csv', 
         header = 0, usecols = [
             'file','num_execute_result',
             'execute_result_keys','num_display_data',
@@ -800,7 +800,7 @@ def get_cell_output():
     
 def get_cell_stats():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, 
         usecols = ['file','cell_id','lines_of_code','num_words'], 
         chunksize=10000
@@ -848,7 +848,7 @@ def get_cell_stats():
     
 def get_cell_order():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, usecols = ['file','execution_count','cell_type','cell_id'], 
         chunksize=10000
     )
@@ -922,7 +922,7 @@ def is_monotonic_inc(int_list):
     
 def get_cell_types():
     df_chunks = pd.read_csv(
-        'data_final/cells.csv', 
+        'data_final/cells_final.csv', 
         header = 0, usecols = ['file','cell_id','cell_type'], 
         chunksize=10000
     )
@@ -1003,6 +1003,233 @@ def get_cell_types():
     f.close()
     end = datetime.datetime.now()
     print('Saved final to pickle', end - start)
+
+def get_statuses():
+    flatten = lambda l: [item for sublist in l for item in sublist]
+
+    def string_to_list_of_lists(df, column):
+            df[column] = [[] if len(df[column].iloc[i]) == 2 else [h.replace("'","").split(', ') 
+              for h in df[column].iloc[i][2:-2].replace('(','[').replace(')',']').split('], [')] 
+              for i in range(len(df))]
+
+    print('opening notebooks')
+    n = load_data.load_notebooks()
+    n_py = n[n['lang_name'] == 'python']
+    n_py3 = n_py[[str(l).startswith('3') for l in n_py['python_version']]]
+    print('notebooks final open and python3 row selected')
+    print(len(n_py3), 'files')
+
+    print('opening code')
+    s = datetime.datetime.now()
+    with open('analysis_data/nb_code.df','rb') as f:
+        code = pickle.load(f)
+    code = code[code.file.isin(n_py3.file)]
+
+    print('opening imports')
+    with open('analysis_data/nb_imports.df','rb') as f:
+        imports = pickle.load(f)
+
+    code = code.merge(imports, on = 'file')
+    print('code and imports opened and combined', datetime.datetime.now() - s)
+    print(len(code), 'cells')
+
+    print('aggregating code')
+    s = datetime.datetime.now()
+    print(len(code), 'files')
+    print('code aggregated', datetime.datetime.now() - s)
     
+    
+    def get_status(file, code, imports, variables, functions):
+        status = {
+            'file': file,
+            'import': 0,
+            'variable': 0,
+            'function': 0,
+            'syntax': True,
+            'import_done': [],
+            'variables_done': [],
+            'functions_done': [],
+            'imports_not_used':set([im[1] for im in imports]),
+            'variables_not_used':set(variables),
+            'functions_not_used':set(functions)
+        }
+
+        import_aliases = [im[1] for im in imports]
+
+        try:
+            tree = ast.parse(code)
+            
+            update_status(tree.body, status)
+            status['imports_not_used'] = len(status['imports_not_used'])
+            status['variables_not_used'] = len(status['variables_not_used'])
+            status['functions_not_used'] = len(status['functions_not_used'])
+            status.pop('import_done')
+            status.pop('variables_done')
+            status.pop('functions_done')
+
+            return status
+            
+        except Exception as e:
+            status['syntax'] = False
+            status['imports_not_used'] = len(status['imports_not_used'])
+            status['variables_not_used'] = len(status['variables_not_used'])
+            status['functions_not_used'] = len(status['functions_not_used'])
+            status.pop('import_done')
+            status.pop('variables_done')
+            status.pop('functions_done')
+            return status
+
+    def update_status(t_list, status):
+        for t in t_list:
+
+            new_vars_this_t = []
+            new_funcs_this_t = []
+            func_calls_this_t = []
+
+            if type(t) == ast.For:
+                target = t.target
+                if type(target) == ast.Name:
+                    status['variables_done'].append(target.id)
+                    new_vars_this_t.append(target.id)
+                elif type(target) == ast.Tuple:
+                    for w in ast.walk(t):
+                        if type(w) == ast.Name:
+                            status['variables_done'].append(w.id)
+                            new_vars_this_t.append(w.id)
+                update_status(t.body, status)
+
+            elif type(t) == ast.While:
+                update_status(t.body, status)
+
+            elif type(t) == ast.Assign:        
+                for target in t.targets:
+                    for w in ast.walk(target):
+                        if type(w) == ast.Name and w.id in variables:
+                            status['variables_done'].append(w.id)
+                            new_vars_this_t.append(w.id)
+
+            elif type(t) == ast.With:
+                for item in t.items:
+                    if type(item) == ast.withitem and item.optional_vars:
+                        for w in ast.walk(item.optional_vars):
+                            if type(w) == ast.Name and w.id in variables:
+                                status['variables_done'].append(w.id)
+                                new_vars_this_t.append(w.id)
+                update_status(t.body, status)
+
+
+            elif type(t) in [ast.Import, ast.ImportFrom]:
+                for w in ast.walk(t):
+                    if type(w) == ast.alias:
+                        if w.asname == None:
+                            status['import_done'].append(w.name)
+                        else:
+                            status['import_done'].append(w.asname)
+
+            else:
+                for w in ast.walk(t):
+                    if type(w) == ast.FunctionDef:
+                        new_funcs_this_t.append(w.name)
+                    elif type(w) == ast.Call:
+                        for func_node in ast.walk(w):
+                            if w.func and type(w.func) == ast.Name and w.func.id in functions:
+                                func_calls_this_t.append(w.func.id)
+                                if w.func.id in status['functions_not_used']:
+                                    status['functions_not_used'].remove(w.func.id)
+                            elif w.func and type(w.func) == ast.Attribute and w.func.attr in functions:
+                                func_calls_this_t.append(w.func.attr)
+                                if w.func.attr in status['functions_not_used']:
+                                    status['functions_not_used'].remove(w.func.attr)
+
+                    elif type(w) == ast.Name:
+                        if w.id in status['imports_not_used']:
+                            status['imports_not_used'].remove(w.id)
+                            if w.id not in status['import_done']:
+                                status['import'] += 1
+                        elif (w.id in status['variables_not_used'] and 
+                              w.id not in new_vars_this_t and
+                              type(t) not in [ast.FunctionDef, ast.ClassDef]
+                        ):
+                            status['variables_not_used'].remove(w.id)
+                            if w.id not in status['variables_done']:
+                                status['variable'] += 1
+
+                status['functions_done'] += new_funcs_this_t
+                if len(set(func_calls_this_t) - set(status['functions_done'])) > 0:
+                    status['function'] += 1
+
+    def get_all_vars(code):
+        variables = set([])
+
+        try:
+            tree = ast.parse(code)
+        except Exception as e:
+            return variables
+
+        for t in tree.body:
+            if type(t) == ast.Assign:        
+                for target in t.targets:
+                    for w in ast.walk(target):
+                        if type(w) == ast.Name:
+                            variables.add(w.id)
+
+        return variables
+
+    def get_user_funcs(code):
+        funcs = []
+
+        try:
+            tree = ast.parse(code)
+        except Exception as e:
+            return variables
+
+        for t in tree.body:
+            if type(t) == ast.FunctionDef:        
+                funcs.append(t.name)
+
+            if type(t) == ast.Assign and type(t.value) == ast.Lambda:
+                for target in t.targets:
+                    try:
+                        funcs.append(target.id)
+                    except:
+                        pass
+
+            if type(t) == ast.ClassDef:
+                class_name = t.name
+                funcs.append(class_name)
+                for w in ast.walk(t):
+                    if type(w) == ast.FunctionDef:
+                        function_name = w.name
+                        funcs.append(class_name +'.' + function_name)
+
+        return funcs
+
+    print('getting statuses')
+    start = datetime.datetime.now()
+    statuses = []
+    for i, row in code.iterrows():
+        row_code = '\n'.join([c for c in '\n'.join([l for l in row.code if str(l) != 'nan']).split('\n') if (c != '' and 
+                  str(c) != 'nan' and not c.strip().startswith('%') and not c.strip().startswith('?') and 
+                  not c.strip().startswith('!'))])
+
+        variables = get_all_vars(row_code)
+        functions = get_user_funcs(row_code)
+        statuses.append(get_status(row.file, row_code, row.imports, variables, functions))
+        if i%10000 == 0:
+            print(i, datetime.datetime.now() - start)
+    end = datetime.datetime.now()
+    print(end - start)
+
+    statuses_df = pd.DataFrame(statuses)
+
+    print('saving file')
+    s = datetime.datetime.now()
+    f = open('analysis_data/statuses.df', 'wb')
+    pickle.dump(statuses_df, f)
+    f.close()
+    print('saved', datetime.datetime.now() - s)
+
+    print('Done!')
+
 if __name__ == '__main__':
     main()

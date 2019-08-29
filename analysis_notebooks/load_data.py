@@ -322,17 +322,6 @@ def load_edu_status():
     return repo_edu_status
 
 ### Methods to process csv columns
-     
-def string_to_list_of_lists(df, column):
-    """ 
-    Converts a string column back to a list of lists 
-    (needed because list columns are converted to strings in CSV)
-    
-    e.g. [['pandas','pd'],['os','os']]
-    """
-    df[column] = [[] if len(df[column][i]) == 2 else [h.replace("'","").split(', ') 
-          for h in df[column][i][2:-2].replace('(','[').replace(')',']').split('], [')] 
-          for i in range(len(df))]
 
 def string_to_list(df, column):
     """ 
