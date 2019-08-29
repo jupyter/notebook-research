@@ -27,6 +27,8 @@ Access tokens should be saved as environment variables with the prefix GITHUB_TO
 # will run with nohup, progress saved in query_{#}.log
 python3 parallelize_query.py min max [--update]
 
+# -- or --
+
 # all at once on one github token
 python3 query_git.py min max [--update]
 ```
@@ -45,6 +47,8 @@ python3 process.py [--update]
 # in parallel across multiple github tokens
 # will run with nohup, progress saved in download_{#}.log
 python3 parallelize_download.py [--local]
+
+# -- or --
 
 # all at once on one github token
 python3 download.py
@@ -67,6 +71,8 @@ python3 convert.py
 # in parallel across 10 workers (does not rely on GitHub tokens)
 # will run with nohup, progress saved in extract_{#}.log
 python3 parallelize_extract.py
+
+# -- or --
 
 # all at once
 python3 extract_data.py
