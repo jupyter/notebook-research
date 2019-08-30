@@ -8,4 +8,9 @@ Included in this repositry is a small sample dataset of 10 Jupyter Notebooks. Th
 
 ## If running with your own data
 
-Notebooks within the `analysis_notebooks` directory can be run only if `extract_data.py` has been run to completion and the four final CSV files (`notebooks_final.csv`, `repos_final.csv`, `owners_final.csv`, and `cells_final.csv`) have been moved to the `data_final` directory here. Further, `aggregate.py` needs to run to create the aggregated DataFrames.
+1. Notebooks within the `analysis_notebooks` directory can be run only if `extract_data.py` has been run to completion. 
+2. When data has been extracted, run through `PrepareData.ipynb` to get csv files from the S3 bucket, combine them, and remove missing values and notebooks that are a part of ipynb_checkpoints.
+
+At this point, the four final CSV files (`notebooks_final.csv`, `repos_final.csv`, `owners_final.csv`, and `cells_final.csv`) are in the `data_final` directory here. 
+
+3. Finally, run `aggregate.py` to create the aggregated DataFrame. This can take up to 20 hours to run, so I'd recommend running it as a background process and monitoring its log file: `nohup python3 -u aggregate.py > aggregate_status.log &`.
