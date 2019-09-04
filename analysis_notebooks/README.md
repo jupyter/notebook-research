@@ -4,7 +4,7 @@ The analysis notebooks are best understood if looked at in the order indicated b
 
 ## Running Analysis Notebooks
 
-Included in this repositry is a small sample dataset of 10 Jupyter Notebooks. This can be used to understand the structure of the data without downloading all 4.3 million notebooks. In the `analysis_data` directory are the aggregation results of `aggregate.py` on this data. They are all pickled objects to make it easier to keep data types consistent.
+Included in this repository is a small sample dataset of 10 Jupyter Notebooks. This can be used to understand the structure of the data without downloading all 4.3 million notebooks. In the `analysis_data` directory are the aggregation results of `aggregate.py` on this data. They are all pickled objects to make it easier to keep data types consistent.
 
 ## If running with your own data
 

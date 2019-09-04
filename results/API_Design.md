@@ -2,11 +2,11 @@
 
 There are a lot of different ways of spelling out functionality in APIs. Some of them are painful, while others are highly usable. We may be able to learn things about API design by looking at what APIs people are using and how. One goal here is to design good APIs by advising the granularity questions (lots of small objects/functions, or a few with lots or arguments)?
 
-Notebook errors are a good indicator of what users struggle with. However, its important to keep in mind that many users will take care of errors before posting a notebook publicly to GitHub. It's likely that most struggles faced by users are not visible to us in the end product of their notebook. Here, I investigate the frequency and types of errors as well as the relationship between number of errors and a variety of other factors, including educational status, amount of markdown text, and whether the notebook cells were run in order.
+Notebook errors are a good indicator of what users struggle with. However, it's important to keep in mind that many users will take care of errors before posting a notebook publicly to GitHub. It's likely that most struggles faced by users are not visible to us in the end product of their notebook. Here, I investigate the frequency and types of errors as well as the relationship between number of errors and a variety of other factors, including educational status, amount of markdown text, and whether the notebook cells were run in order.
 
 ## Methods
 
-For this research, we narrow our focus to notebooks written in Python. More specifically, for inspection of functions and objects, we only consider notebooks that were able to be parsed with the Python abstract syntax tree (ast) package. Only 73.23% of Python 3 notebooks were able to be parsed. A notebook is unable to be parsed if there is a syntax error in any of its code cells. Some notebooks were unable to be parsed because of errors in translating strings from the way they are stored in the JSON files to how they were stored in our database. The section on Errors does not exclude these notebooks, as Python AST was not used to extract information on Errors.
+For this research, we narrow our focus to notebooks written in Python. More specifically, for inspection of functions and objects, we only consider notebooks that were able to be parsed with the Python abstract syntax tree (ast) package. Only 86.25% of Python 3 notebooks were able to be parsed. A notebook is unable to be parsed if there is a syntax error in any of its code cells. Some notebooks were unable to be parsed because of errors in translating strings from the way they are stored in the JSON files to how they were stored in our database. The section on Errors does not exclude these notebooks, as Python AST was not used to extract information on Errors.
 
 ## Functions
 
@@ -30,7 +30,7 @@ Across all function calls, there are an average of 0.99 arguments per function. 
 
 ## Objects
 
-On average, among notebooks that were able to be parsed with they Python abstract syntax tree, there are 20.72 objects defined in a notebook (median = 13). Narrowing this down to only notebooks with at least one object, the median increases to 14 objects.
+On average, among notebooks that were able to be parsed with the Python abstract syntax tree, there are 20.72 objects defined in a notebook (median = 13). Narrowing this down to only notebooks with at least one object, the median increases to 14 objects.
 
 ## Errors
 

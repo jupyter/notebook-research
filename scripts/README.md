@@ -18,7 +18,7 @@
 
 ### 2. Querying Git
 
-Querying git requires the use of at least one personal access token. These can be aquired in developer settings. For more information see the (GitHub API)[https://developer.github.com/v3/auth/].
+Querying git requires the use of at least one personal access token. These can be acquired in developer settings. For more information see the (GitHub API)[https://developer.github.com/v3/auth/].
 
 Access tokens should be saved as environment variables with the prefix GITHUB_TOKEN. For instance: `export GITHUB_TOKEN3="..."`. 
 
