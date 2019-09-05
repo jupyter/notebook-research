@@ -1,4 +1,3 @@
-# notebook-research
 # Public GitHub Notebook Corpus Research Collaboration
 
 ## Project Description
