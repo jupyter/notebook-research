@@ -163,6 +163,15 @@ def load_errors():
     print('Errors loaded in', end - start)
     return errors_df
 
+def load_comments():
+    start = datetime.datetime.now()
+
+    f = open('analysis_data/comments.df', 'rb')
+    comments_df = pickle.load(f)
+    f.close()
+    end = datetime.datetime.now()
+    print('Comments loaded in', end - start)
+    return comments_df 
 
 def load_cell_types():
     start = datetime.datetime.now()
@@ -244,6 +253,17 @@ def load_special():
     print('Special functions loaded in', end - start)
     return special_df
     
+def load_code_data_sci():
+    start = datetime.datetime.now()
+
+    f = open('analysis_data/code_data_sci.csv')
+    code_data_sci = pd.read_csv(f)
+    f.close()
+
+    end = datetime.datetime.now()
+    print('Code for Data Science Notebooks loaded in', end - start)
+    return code_data_sci
+    
 def load_vis_uses():
     start = datetime.datetime.now()
 
@@ -276,6 +296,17 @@ def load_function_defs():
     end = datetime.datetime.now()
     print('Function definitions loaded in', end - start)
     return function_defs_df
+
+def load_all_processed_code():
+    start = datetime.datetime.now()
+
+    f = open('analysis_data/time/all_processed_code.list', 'rb')
+    all_processed_code = pickle.load(f)
+    f.close()
+    
+    end = datetime.datetime.now()
+    print('Processed code loaded in', end - start)
+    return all_processed_code
 
 def load_function_use():
     start = datetime.datetime.now()

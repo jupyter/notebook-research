@@ -22,6 +22,8 @@ def main():
     get_cell_order()
     print('\nCell Types')
     get_cell_types()
+    print('\nComments')
+    get_comments()
     
     # Used first in Packages.ipynb
     print('\nGet Imports')
@@ -88,8 +90,8 @@ def get_magic():
         return [
             l
             for l in load_data.flatten([l.split('\n') for l in list_of_lines_of_code if str(l) != 'nan'])
-            if l.startswith('%') or l.startswith('!') or
-            l.startswith('?')
+            if l.startswith('%') or '!' in l or
+            l.startswith('?') or l.endswith('?')
         ]
 
 
@@ -797,6 +799,50 @@ def get_cell_output():
     end = datetime.datetime.now()
     print('Saved',end - start)
     
+def get_comments():
+    df_chunks = pd.read_csv(
+    'data_final/cells_final.csv', 
+        header = 0, usecols = [
+            'file','num_comments'
+        ], 
+        chunksize=10000
+    )
+
+    # 27 minutes
+    start = datetime.datetime.now()
+    comments_dfs = []
+
+    i = 0
+    for chunk in df_chunks:
+
+        df = chunk.groupby('file')[[
+            'num_comments'
+        ]].sum().reset_index()
+
+        comments_dfs.append(df)
+
+        if i % 1000 == 0:
+            print(i, datetime.datetime.now() - start)
+        i += 1
+
+
+    end = datetime.datetime.now()
+    print('Chunks done', end - start)
+    
+    # 33 seconds
+    start = datetime.datetime.now()
+    comments_df = pd.concat(comments_dfs).groupby('file')[[
+        'num_comments'
+    ]].sum().reset_index()
+    end = datetime.datetime.now()
+    print('Combined', end - start)
+
+    # 3 seconds
+    start = datetime.datetime.now()
+    with open('analysis_data/comments.df', 'wb') as f:
+        pickle.dump(comments_df, f)
+    end = datetime.datetime.now()
+    print('Saved',end - start)
     
 def get_cell_stats():
     df_chunks = pd.read_csv(
