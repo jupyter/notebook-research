@@ -6,6 +6,7 @@
 - **[results](results/)**: written results of the research, available in pdf and markdown formats.
 - **[scripts](scripts/)**: scripts to reproduce data query, download, and extraction. For instructions, see [the scripts readme](scripts/README.md).
 
+
 ## Project Description
 As an extension of work done by [Rule et al.](https://blog.jupyter.org/we-analyzed-1-million-jupyter-notebooks-now-you-can-too-guest-post-8116a964b536) in 2017, the goal of this project is to collect and analyze all public Jupyter Notebooks on GitHub ([~1 million in 2017](https://library.ucsd.edu/dc/collection/bb6931851t), [now nearly 5 million](https://github.com/parente/nbestimate/blob/master/estimate.ipynb)). This analysis will help designers, developers, and researchers in the Jupyter community quantitatively assess how people use notebooks, with an emphasis on applications in data science, machine learning, and information visualization. This GitHub repository holds the scripts used to search, download, and process notebooks from GitHub, the resulting CSV data files, and the set of notebooks used to analyze the corpus. Given the number and size of notebooks on GitHub, we expect these corpus notebooks to be stored in a separate repository optimized for data storage.
 
