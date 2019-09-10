@@ -42,16 +42,11 @@ def data():
     for p in ['matplotlib','altair','seaborn',
            'ggplot','bokeh','pygal','plotly',
            'geoplotlib','gleam','missingno',
-           'leather','sagemaker','cntk',
+           'leather','cntk',
             'sklearn','tensorflow','keras','torch', 'mxnet','pytorch']:
         if p not in df.columns:
             df[p] = [p in [i[0].split('.')[0] for i in im] for im in df.imports]
-            
-    if 'boto' not in df.columns:
-        df['boto'] = ['boto' in [i[0].split('.')[0] for i in im]
-            or 'boto3' in [i[0].split('.')[0] for i in im]
-            for im in df.imports
-        ]
+
 
     # 1 minute
     errors_temp = load_data.load_errors()
@@ -115,7 +110,6 @@ def interactive(data_frames):
         'min_watchers': 0,
         'min_issues': 0,
         'min_forks': 0,
-        'uses_aws': False,
         'uses_ml': False,
         'uses_vis': False,
         'user': True,
@@ -192,13 +186,6 @@ def interactive(data_frames):
     )):
         query['min_issues'] = issues
 
-    def get_aws_use(aws = widgets.Checkbox(
-        value = False,
-        description = 'Uses AWS?',
-        style=dict(description_width='initial')
-    )):
-        query['uses_aws'] = aws
-
     def get_ml_use(ml = widgets.Checkbox(
         value = False,
         description = 'Uses a Machine Learning Framework?',
@@ -269,7 +256,6 @@ def interactive(data_frames):
 
     print()
     display(Markdown('### Uses'))
-    interact(get_aws_use)
     interact(get_ml_use)
     interact(get_vis_use)
 
@@ -321,8 +307,6 @@ def subset(data_frames, query):
         ))
 
     uses_labels = []
-    if query['uses_aws']:
-        uses_labels.append('boto, sagemaker, or mnet')
     if query['uses_ml']:
         uses_labels.append('at least one machine learning framework')
     if query['uses_vis']:
@@ -355,14 +339,6 @@ def subset(data_frames, query):
         df_subset = df_subset[(df_subset.repo_id.isin(data_frames['edu_status'][
             data_frames['edu_status'].edu.isin(edu_types)
         ].repo_id))]
-
-    if query['uses_aws']:
-        df_subset = df_subset[
-            df_subset['boto'] |
-            df_subset['sagemaker'] |
-            df_subset['mxnet']
-        ]
-
 
     if query['uses_ml']:
         df_subset = df_subset[
@@ -511,31 +487,6 @@ def report_comparisons(data_frames_sub, data_frames):
 
     compare(visualization, 'Visualization Package Use')
     compare_plots(visualization_plot, 'Visualization Package Use')
-
-
-    ### AWS Package Use
-    def aws_plot(data, title):
-        x = ['sagemaker','boto','mxnet']
-        x_pos = np.arange(len(x))
-        y = [
-            sum(data['df'].sagemaker)/len(data['df']),
-            sum(data['df'].boto)/len(data['df']),
-            sum(data['df'].mxnet)/len(data['df'])  
-        ]
-        plt.bar(x_pos, y, color = 'teal')
-        plt.xticks(x_pos, x, rotation = 70)
-        plt.title(title)
-        plt.ylabel('Proportion of Notebooks')
-        
-    def aws(data, what):
-        print("\n{0}% of {1} notebooks import at least one of sagemaker, boto, or mxnet.".format(
-            round(100*sum(data['df'].sagemaker|data['df'].boto|data['df'].mxnet)/len(data['df']),3),
-            what
-        ))
-        
-    compare(aws, 'AWS Package Use')
-    compare_plots(aws_plot, 'AWS Package Use')
-    
     
     ### Errors
     def errors(data, what):

@@ -16,6 +16,7 @@ scripts/download_partitions.pickle
 scripts/test.py
 scripts/convert.py
 *Untitled*.ipynb
+analysis_notebooks/NotebookInspector.ipynb
 .DS_Store
 
 # Byte-compiled / optimized / DLL files

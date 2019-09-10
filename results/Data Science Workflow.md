@@ -66,14 +66,14 @@ The first approach was clustering cells with K Means. I first performed TF-IDF o
 
 Experimenting with different numbers of clusters, I found that 6 gave the best separation of tasks. This grouping did not result in a cluster for function definitions and has two clusters relating to data loading and manipulation. However, adding more clusters didn’t create a function definition cluster, rather duplicated clusters for other tasks. Further, removing clusters made the groups more convoluted and difficult to assign to a single task.
 
-<img src=./images/km_clusters.png width=400>
+<img src=./images/km_clusters.png>
 
 *Figure 2: K Means Clustering, top words per cluster*
 
 Most of the time, the clusters were easy to distinguish. For example, the top three tokens in cluster 4 are the `<visualization>` tag, `pyplot`, and `plot`. This cluster was assigned the topic “visualization”. Two clusters did not relate to a topic, either a mixture of tasks (e.g. cluster 3 is a mixture of logic and data manipulation) or tokens that didn’t relate to any task in particular (e.g. cluster 7 doesn’t fit any specific topic). These “other” cells did not get assigned a task. Using this strategy, 41% of cells were assigned to a topic. 
 
 
-<img src=./images/km_dist.png width=400>
+<img src=./images/km_dist.png>
 
 *Figure 3: K Means Clustering, distribution of tasks*
 
@@ -90,13 +90,13 @@ Experimenting with different numbers of topics and numbers of tokens per topic, 
 
 To assign meanings, I looked at the tokens distribution for each topic. 
 
-<img src=./images/lda_topics.png width=400>
+<img src=./images/lda_topics.png>
 
 *Figure 4: Latent Dirichlet Allocation, token distribution per topic*
 
 Just like with K means, some topics make a lot of sense. For example topic 6 has `pandas`, `read_csv`, `columns`, and `dataframe` as its most likely tokens, associating it with data loading and manipulation. Topics 3 and 4 don’t make as much sense, combining tokens related to multiple topics or no topics in particular. With this strategy, 77% of cells were assigned at least one task.
 
-<img src=./images/lda_distrib.png width=400>
+<img src=./images/lda_distrib.png>
 
 *Figure 5: Latent Dirichlet Allocation, distribution of tasks*
 
@@ -115,7 +115,7 @@ The final approach was deterministic. Since we have a good idea of what commands
 
 With this approach, 55% of cells fell into at least one category.
 
-<img src=./images/determ_distrib.png width=400>
+<img src=./images/determ_distrib.png>
 
 *Figure 6: Deterministic Approach, distribution of tasks*
 
@@ -129,5 +129,5 @@ Because this is unsupervised, it’s hard to say which of the three options is b
 
 At the most basic level, this is what a Data Science Jupyter Notebook looks like based on these results:
 
-<img src=./images/workflow1.png width=400>
-<img src=./images/workflow2.png width=400>
+<img src=./images/workflow1.png>
+<img src=./images/workflow2.png>

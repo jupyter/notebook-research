@@ -10,7 +10,7 @@ In the original grant proposal for Project Jupyter, written by Brian Granger and
 
 I define a repository as *collaborative* if it has any forks and/or open issues, meaning people are actively working on the same repository or suggesting changes to the owner. A repository is *watched* if it is not collaborative, but has at least one stargazer or watcher. Even if individuals aren’t collaborating on these repositories, they are viewed by other GitHub users. An *isolated *repository is neither collaborative nor watched; no one besides the owner is working on or viewing the repository.
 
- With these definitions, I found that 17.5% of repositories are collaborative, 41.3% are watched, and 41.2% are isolated. On average, a collaborative repository has 11.76 forks (median = 1) and 1.98 issues (median = 0). 
+With these definitions, I found that 17.5% of repositories are collaborative, 41.3% are watched, and 41.2% are isolated. On average, a collaborative repository has 11.76 forks (median = 1) and 1.98 issues (median = 0). 
 
 There is a higher ratio of words of markdown to lines of code among collaborative notebooks (mean = 8.2), followed by watched notebooks (6.3) and isolated notebooks (5.7). Further, collaborative and in sight repositories are more likely to have a description than an isolated repository (58% compared to 48%). The more collaborative a repository is, the larger it tends to be and the more notebooks it tends to hold.
 
