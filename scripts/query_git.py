@@ -2,9 +2,8 @@
 Script to query GitHub for Jupyter notebooks in given size range. 
 
 Queries GitHub for Jupyter Notebooks, downloads query metadata 
-JSON files, and, if specified, processes basic data from all query 
-files to notebooks1.csv. After notebooks1.csv is created, files 
-can be downloaded with download.py.
+JSON files. After metadata is downloaded, they 
+can be processed with process.py.
 """
 
 import time
@@ -31,6 +30,7 @@ from funcs import (
     debug_print,
     write_to_log,
     df_to_s3,
+    s3_to_df,
     list_s3_dir
 )
 
@@ -64,15 +64,6 @@ def main():
         help="Saves output locally instead of in S3."
     )
     parser.add_argument(
-        "--process", action="store_const", 
-        dest="process", const=True, default=False, 
-        help=(
-            "Processes metadata at the end to update "
-            + "notebooks.csv, otherwise, the program only "
-            + "queries and downloads query files."
-        )
-    )
-    parser.add_argument(
         "--worker", metavar="N", type=int, 
         help=(
             "GITHUB_TOKEN assigned to these sizes (workers "
@@ -87,27 +78,17 @@ def main():
     updating = args.updating
     worker = args.worker
     local = args.local
-    process = args.process
 
     # If updating, look at saved_urls to determine a duplicate.
     # New versions of notebooks will overwrite earlier downloads.
     saved_urls = []
-    if updating:
-        # Double check update with user (this takes a long time).
-        sure = input((
-            "Would you like to update the corpus (i.e. "
-            + "search for notebooks added or updated since last search)? "
-            + "This may take a while. [y/n]: "
-        ))
-        if (
-            sure.lower().strip() == "y" or 
-            sure.lower().strip() == "yes"
-        ):
-            if "notebooks1.csv" in os.listdir(PATH):
-                notebooks1 = pd.read_csv("{0}/notebooks1.csv".format(PATH))
-                saved_urls = list(notebooks1.html_url)
+    current_csvs = os.listdir(PATH) if local else list_s3_dir('csv')
+    if updating and "notebooks1.csv" in current_csvs:
+        if local:
+            notebooks1 = pd.read_csv("{0}/notebooks1.csv".format(PATH))
         else:
-            updating = False
+            notebooks1 = s3_to_df('csv/notebooks1.csv')
+        saved_urls = list(notebooks1.html_url)
 
     # Set worker.
     if worker != None:
@@ -130,14 +111,23 @@ def main():
     )        
 
     # List notebooks already downloaded.
-    current_notebooks = (
-        set(os.listdir("../data/notebooks")) if local 
-        else list_s3_dir("notebooks/")
-    ) if updating else []
+    current_notebooks = set(notebooks1.file) if updating else []
 
     # Get json query files for given size range.
     num_needed = get_json(MIN, MAX, saved_urls, header, 
                           updating, local, current_notebooks)
+
+    if worker != None:
+        with open('num_needed_{0}.save'.format(worker),'w') as f:
+            f.write(str(num_needed))
+    else:
+        command = 'nohup python3 -u process.py --needed {0}'.format(num_needed)
+        if updating:
+            command += ' --updating'
+        if local:
+            command += ' --local'
+        
+        os.system(command + ' > process.log &')
 
     # Check time, log, and display status.
     check1 = datetime.datetime.now()
@@ -146,18 +136,11 @@ def main():
         "\nJson query files have been downloaded. "
         + "Time: {0}{1}".format(check1 - start, BREAK)
     )
-
-    # Extract basic data from json files, save to CSV.
-    if process:
-        clean_metadata(num_needed, updating, local)
-
+    
     # Check time, log, and display status.
     check2 = datetime.datetime.now()
     write_to_log("../logs/timing.txt","CHECKPOINT 2: {0}".format(check2))
-    debug_print(
-        "Notebooks1, Owners1, and Repos1 were created and saved. "
-        + "Time: {0}{1}".format(check2 - check1, BREAK)
-    )
+        
     debug_print("All together, {0}".format(check2 - start))
 
 
@@ -542,7 +525,7 @@ def save_page(
 
         for item in j["items"]:
             # If updating, done if this html_url has already been downloaded.
-            if query_status["updating"]:
+            if query_status["updating"] and "file" in item:
                 html_url = item["html_url"].replace("#","%23")
                 file_name = item["file"]
                 # If the same version of an existing notebook, done.
@@ -586,159 +569,6 @@ def save_page(
             query_status["done"] = True
 
     return r, limit_status, query_status
-
-
-def clean_metadata(num_needed, updating, local):
-    """ 
-    Extract information from metadata JSON files and save to CSVs. 
-    Equivalent to Adam's 1_nb_metadata_cleaning.ipynb.
-    """
-
-    # Get all query files.
-    if local:
-        nb_search_files = os.listdir(JSON_PATH)
-    else:
-        nb_search_files = list_s3_dir('json/')
-   
-    # Sort query files by size then by page number.
-    nb_search_files = sorted(
-        nb_search_files, 
-        key = lambda x: (
-            int(x.split("_")[2].split("..")[0]),
-            int(x.split("_")[3][1:].split(".")[0])
-        )
-    )
-
-    debug_print("We have {0} query files.".format(len(nb_search_files)))
-
-    notebooks = {}
-    repos = {}
-    owners = {}
-    
-    for j, json_file_name in enumerate(nb_search_files):
-        # Keep track of progress.
-        if (j+1) % COUNT_TRIGGER/100 == 0 or j+1 == len(nb_search_files):
-            debug_print("{0} / {1} data files processed".format(
-                j+1, len(nb_search_files)
-            ))
-        
-        file_components = json_file_name.replace(".json","").split("_")
-        filesize = file_components[2]
-        query_page = int(file_components[3][1:])
-                
-        if local:
-            with open(JSON_PATH+json_file_name, "r") as json_file:
-                # Parse file name to get size and query page.
-                file_dict = json.load(json_file)
-        else:
-            obj = s3.Object(
-                "notebook-research",
-                "json/{0}".format(json_file_name)
-            )
-            file_dict = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-
-        # Report missing data.
-        if "incomplete_results" in file_dict:
-            if file_dict["incomplete_results"] == True:
-                msg = "{0} has incomplete results".format(json_file_name)
-                write_to_log("../logs/nb_metadata_cleaning_log.txt", msg)
-        
-        days_since = file_dict["days_since"]
-        if "items" in file_dict:
-            if len(file_dict["items"]) == 0:
-                msg = "{0} has 0 items".format(json_file_name)
-                write_to_log("../logs/nb_metadata_cleaning_log.txt", msg)
-            
-            else:
-                # Save data for each item.
-                for i in range(len(file_dict["items"])):
-                    item = file_dict["items"][i]
-                    item_repo = item["repository"]
-                    repo_id = item_repo["id"]
-                    owner_id = item_repo["owner"]["id"]
-                    
-                    # Don"t save forked notebooks.
-                    if item_repo["fork"]:
-                        continue
-
-                    # Full path is unique for each file.
-                    name = "{0}/{1}/{2}".format(
-                        item_repo["owner"]["login"], 
-                        item_repo["name"], 
-                        item["path"]
-                    ).replace("/","..")
-                
-                    notebook = {
-                        "file": name,
-                        "html_url": item["html_url"],
-                        "name" : item["name"],
-                        "path": item["path"],
-                        "repo_id": repo_id,
-                        "owner_id": owner_id,
-                        "filesize": filesize,
-                        "query_page": query_page,
-                        "days_since": days_since
-                    }
-                    notebooks[name] = notebook
-
-                    if repo_id not in repos:
-                        repo = {
-                            "repo_name": item_repo["name"],
-                            "owner_id": owner_id,
-                            "repo_description": item_repo["description"],
-                            "repo_fork": item_repo["fork"],
-                            "repo_html_url": item_repo["html_url"],
-                            "repo_private": item_repo["private"],
-                        }
-                        repos[repo_id] = repo
-
-                    if owner_id not in owners:
-                        owner = {
-                            "owner_html_url": item_repo["owner"]["html_url"],
-                            "owner_login": item_repo["owner"]["login"],
-                        }
-                        owners[owner_id] = owner  
-
-                    # If updating we dont always need the full page.
-                    if updating and len(notebooks) == num_needed:
-                        break                  
-        else:
-            msg = "{0} has no items object".format(json_file_name)
-            write_to_log("../logs/nb_metadata_cleaning_log.txt", msg) 
-    
-        if updating and len(notebooks) == num_needed:
-            break    
-
-    # Display status
-    debug_print(("\nAfter processing all query files, "
-                "we have {0} notebooks.").format(len(notebooks)))
-    debug_print("Written by {0} owners.".format(len(owners)))
-    debug_print("Held in {0} repositories.".format(len(repos)))
-
-    # Translate dictionaries to DataFrames and save to CSV.
-    # Ordered by days since, if duplicates keep the most recent 
-    # (i.e. keep last, which was found more days since 1-1-19).
-    notebooks_df = pd.DataFrame(notebooks).transpose()\
-        .sort_values(by=["days_since","file"]).drop_duplicates(
-            subset =["file"], 
-            keep="last"
-        )
-    owners_df = pd.DataFrame(owners).transpose().reset_index().rename(
-        columns = {"index":"owner_id"}, index = str
-    )
-    repos_df = pd.DataFrame(repos).transpose().reset_index().rename(
-        columns = {"index":"repo_id"}, index = str
-    )
-
-    if local:
-        notebooks_df.to_csv("{0}/notebooks1.csv".format(PATH), index = False)
-        owners_df.to_csv("{0}/owners1.csv".format(PATH), index = False)
-        repos_df.to_csv("{0}/repos1.csv".format(PATH), index = False)
-    else:
-        df_to_s3(notebooks_df, "csv/notebooks1.csv")
-        df_to_s3(owners_df, "csv/owners1.csv")
-        df_to_s3(repos_df, "csv/repos1.csv")
-
 
 if __name__ == "__main__":
     main()

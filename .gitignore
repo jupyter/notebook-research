@@ -1,22 +1,19 @@
 analysis_notebooks/__pycache__
 analysis_notebooks/.ipynb_checkpoints
-analysis_notebooks/7*
-analysis_notebooks/10*
-analysis_notebooks/11*
 analysis_notebooks/Basics.ipynb
 analysis_notebooks/Features.ipynb
 analysis_notebooks/.DS_Store
-analysis_notebooks/data 
-analysis_notebooks/data_final
+analysis_notebooks/data_final_real/
+analysis_notebooks/analysis_data_real/ 
 analysis_notebooks/edu_repo_ids.csv
 analysis_notebooks/non_edu_repo_ids.csv
 scripts/__pycache__
 scripts/check_queries.py
 scripts/download_partitions.pickle
 scripts/test.py
-scripts/parallelize*
 scripts/convert.py
 *Untitled*.ipynb
+analysis_notebooks/NotebookInspector.ipynb
 .DS_Store
 
 # Byte-compiled / optimized / DLL files

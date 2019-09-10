@@ -34,6 +34,8 @@ from funcs import (
     list_s3_dir, 
 )
 
+S3_PATH = "csv"
+
 def main():
     # Parse command line arguments.
     parser = argparse.ArgumentParser()
@@ -62,7 +64,7 @@ def main():
     if local:
         current_csvs = set(os.listdir(PATH))
     else:
-        current_csvs = list_s3_dir("csv/")
+        current_csvs = list_s3_dir(S3_PATH)
 
     # Open basic data from json files (files created in query_git.py).
     if set([
@@ -80,44 +82,79 @@ def main():
     debug_print("Notebooks1, Owners1, and Repos1 were found and opened."+BREAK)
 
     ### Add information for repositories and owners. ##################
-    owners2, repos2 = update_owners_repos(owners1, repos1, local)
+    save = False
+    if not set(["owners2{0}.csv".format(EXTENSION), "repos2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
+        owners2, repos2 = update_owners_repos(owners1, repos1, local)
+        save = True
+    else:
+        try:
+            owners2_old = get_df("owners2{0}.csv".format(EXTENSION), local)
+            repos2_old = get_df("repos2{0}.csv".format(EXTENSION), local)
+            debug_print("Found and opened data for {0} owners and {1} repos.".format(
+                len(owners2_old), len(repos2_old)
+            ))
+        except:
+            owners2_old = []
+            repos2_old = []
+
+        if len(owners2_old) > 0 and len(repos2_old) > 0:
+            owners1_new = owners1[~owners1.owner_id.isin(owners2_old.owner_id)]
+            repos1_new = repos1[~repos1.repo_id.isin(repos2_old.repo_id)]
+        else:
+            owners1_new = owners1
+            repos1_new = repos1
+
+        debug_print("Collecting data for {0} owners and {1} repos.".format(
+            len(owners1_new), len(repos1_new)
+        ))
+
+        if len(owners1_new) > 0 and len(repos1_new) > 0:
+            owners2_new, repos2_new = update_owners_repos(owners1_new, repos1_new, local)
+
+            if len(owners2_new) > 0 and len(repos2_new) > 0:
+                owners2 = pd.concat([owners2_old, owners2_new]).drop_duplicates(subset = 'owner_id')
+                repos2 = pd.concat([repos2_old, repos2_new]).drop_duplicates(subset = 'repo_id')
+            else:
+                owners2 = owners2_old
+                repos2 = repos2_old
+        else:
+            owners2 = owners2_old
+            repos2 = repos2_old
     
     ## Save
-    debug_print("Saving combined data for {0} owners and {1} repos".format(
-        len(owners2), len(repos2)
-    ))
-    if local:
-        owners2.to_csv("{0}/owners2{1}.csv".format(PATH, EXTENSION), index = False)
-        repos2.to_csv("{0}/repos2{1}.csv".format(PATH, EXTENSION), index = False)
-    else:
-        df_to_s3(owners2, "csv/owners2{0}.csv".format(EXTENSION))
-        df_to_s3(repos2, "csv/repos2{0}.csv".format(EXTENSION))
-    debug_print("Owners2 and Repos2 were created and saved.\n"+BREAK)
-    
-    debug_print("Repos2 was found and opened.\n"+BREAK)        
-    
+    if save:
+        debug_print("Saving combined data for {0} owners and {1} repos".format(
+            len(owners2), len(repos2)
+        ))
+        if local:
+            owners2.to_csv("{0}/owners2{1}.csv".format(PATH, EXTENSION), index = False)
+            repos2.to_csv("{0}/repos2{1}.csv".format(PATH, EXTENSION), index = False)
+        else:
+            df_to_s3(owners2, "{0}/owners2{1}.csv".format(S3_PATH, EXTENSION))
+            df_to_s3(repos2, "{0}/repos2{1}.csv".format(S3_PATH, EXTENSION))
+        debug_print("Owners2 and Repos2 were created and saved.\n"+BREAK)
+        
     
     ## Add data on cells within each notebook. #######################
-    save = False
-    if not set(["notebooks2{0}.csv".format(EXTENSION),"cells1{0}.csv".format(EXTENSION)]).issubset(current_csvs):
-        notebooks2, cells1 = add_nb_cells(notebooks1, local)
-        save = True
+    if not set(["notebooks2{0}.csv".format(EXTENSION)]).issubset(current_csvs):
+        print("Notebooks2 not found, creating from scratch.")
+        get_all_nb_cells(notebooks1, local, 0)
     else:
         # Get existing data.
         try:
             notebooks2_old = get_df("notebooks2{0}.csv".format(EXTENSION), local)
-            cells1_old = get_df("cells1{0}.csv".format(EXTENSION), local)
-            debug_print("Found and opened data for {0} notebooks and {1} cells.".format(
-            len(notebooks2_old), len(cells1_old)
-        ))
-        except:
+            debug_print("Found and opened notebook data for {0} notebooks.".format(
+                len(notebooks2_old)
+            ))
+        except Exception as e:
             notebooks2_old = []
-            cells1_old = []
+            print("Notebooks2 could not be opened, creating from scratch.")
+            print(type(e), e)
        
 
         # Isolate rows of notebooks1 corresponding to new notebooks
         if len(notebooks2_old) > 0:
-            notebooks1_new = notebooks1[~notebooks1["file"].isin(notebooks2_old)]
+            notebooks1_new = notebooks1[~notebooks1.file.isin(notebooks2_old.file)]
         else:
             notebooks1_new = notebooks1
 
@@ -127,34 +164,10 @@ def main():
 
         # If there are new notebooks, add cell data
         if len(notebooks1_new) > 0:
-            notebooks2_new, cells1_new = add_nb_cells(notebooks1_new, local)
+            get_all_nb_cells(notebooks1_new, local, len(notebooks2_old))
+
+        del notebooks2_old
            
-            debug_print("Collected data for {0} notebooks and {1} cells.".format(
-                len(notebooks2_new), len(cells1_new)
-            ))
-
-            if len(notebooks2_old) > 0:
-                notebooks2 = pd.concat([notebooks2_old, notebooks2_new], sort = True)
-            else:
-                notebooks2 = notebooks2_new
-            cells1 = pd.concat([cells1_old, cells1_new], sort = True)
-            save = True
-        else:
-            notebooks2 = notebooks2_old
-            cells1 = cells1_old
-
-    # If new data, save.
-    if save:
-        debug_print("Saving combined data for {0} notebooks and {1} cells".format(
-            len(notebooks2), len(cells1)
-        ))
-        if local:
-            notebooks2.to_csv("{0}/notebooks2{1}.csv".format(PATH, EXTENSION), index = False)
-            cells1.to_csv("{0}/cells1{1}.csv".format(PATH, EXTENSION), index = False)
-        else:
-            df_to_s3(notebooks2, "csv/notebooks2{0}.csv".format(EXTENSION))
-            df_to_s3(cells1, "csv/cells1{0}.csv".format(EXTENSION))
-    
     # Check time and report status.
     end = datetime.datetime.now()
     debug_print("TOTAL TIME: {0}".format(end - start))
@@ -166,7 +179,7 @@ def get_df(file_name, local):
     if local:
         df = pd.read_csv("{0}/{1}".format(PATH, file_name))
     else:
-        df = s3_to_df("csv/{0}".format(file_name))
+        df = s3_to_df("{0}/{1}".format(S3_PATH, file_name))
     return df
 
 
@@ -188,26 +201,16 @@ def update_owners_repos(owners, repos, local):
         if i % COUNT_TRIGGER == 0:
             debug_print("{0} / {1} repo data files processed".format(i, len(repo_ids)))
         
-        if local:
-            try:
-                with open("../data/repos/repo_{0}.json".format(repo_id), "r") as repo_json_file:
-                    repo_json = json.load(repo_json_file)
-
-            except Exception as e:    
-                missing += 1   
-                # Report missed files.
-                msg = "Repo {0} metadata file did not open or could not process.".format(repo_id)
-                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
-        else:
-            try:
-                obj = s3.Object("notebook-research","repos/repo_{0}.json".format(repo_id))
-                repo_json = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-            
-            except Exception as e:
-                missing += 1
-                # Report missed files.
-                msg = "Repo {0} metadata did not process.".format(repo_id)
-                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+        try:
+            obj = s3.Object("notebook-research","repos/repo_{0}.json".format(repo_id))
+            repo_json = json.loads(obj.get()["Body"].read().decode("UTF-8"))
+        
+        except Exception:
+            missing += 1
+            # Report missed files.
+            msg = "Repo {0} metadata did not process.".format(repo_id)
+            write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+            continue
 
         if repo_json != None:
             if "message" in repo_json and (
@@ -275,44 +278,34 @@ def update_owners_repos(owners, repos, local):
             missing += 1
 
     # Display status.
-    debug_print("We have {0} repos.".format(len(new_repo_info)))
+    debug_print("We have {0} new repos.".format(len(new_repo_info)))
     debug_print("Couldn't process {0} files.".format(missing))
-    debug_print("{0} were forked.".format(forked))
+    debug_print("{0} new repos were forked.".format(forked))
     debug_print("{0} files had to be moved".format(moved))
 
-    # Translate dictionaries to DataFrames and save to CSV.
-    updated_owners = owners.merge(pd.DataFrame(new_owner_info).transpose().reset_index(drop=True), on = "owner_id")
-    updated_repos = repos.merge(pd.DataFrame(new_repo_info).transpose().reset_index(drop=True), on = "repo_id")
+    # Translate dictionaries to DataFrames.
+    if len(new_owner_info) > 0 and len(new_repo_info)> 0:
+        updated_owners = owners.merge(pd.DataFrame(new_owner_info).transpose().reset_index(drop=True), on = "owner_id")
+        updated_repos = repos.merge(pd.DataFrame(new_repo_info).transpose().reset_index(drop=True), on = "repo_id")
+    else:
+        updated_owners = []
+        updated_repos = []
     
     return updated_owners, updated_repos
 
-# Equivalent to 6_compute_nb_data.ipynb
-def add_nb_cells(notebooks, local):
-    """ Add data on notebook and cell content. """
-    new_nb_info, cells_info = get_all_nb_cells(notebooks, local)
-    new_nb_info_df = pd.DataFrame(new_nb_info).transpose()
-
-    debug_print("Updating existing notebooks dataframe with new info.")
-    updated_notebooks = notebooks.merge(new_nb_info_df, on = "file", how = "left")
-
-    debug_print("Creating dataframe with cell info.")
-    cells = pd.DataFrame(cells_info).transpose().reset_index(drop=True)
-
-    return updated_notebooks, cells
-    
-def get_all_nb_cells(notebooks, local):
+# Equivalent to 6_compute_nb_data.ipynb    
+def get_all_nb_cells(notebooks, local, done):
     """ Get cell and notebook data for each notebook. """
     new_nb_info = {}
     all_cells_info = {}
     missing = []
     
     for count, row in notebooks.iterrows():
-        
         # Track progress.
         file_name = row["file"]
         data = None
-        if count % COUNT_TRIGGER == 0:
-            print("{0} / {1} notebooks processed for cell data".format(count, len(notebooks)))
+        if count % COUNT_TRIGGER == 0 or count == len(notebooks) - 1:
+            print("{0} / {1} notebooks processed for cell data".format(count, len(notebooks)+done))
             
             # Save data and reset. (In chunks to avoid MemoryError).
             if count > 0:
@@ -326,8 +319,8 @@ def get_all_nb_cells(notebooks, local):
                         notebooks_temp.to_csv("{0}/notebooks2_{1}_{2}.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         cells_temp.to_csv("{0}/cells1_{1}_{2}.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                     else:
-                        df_to_s3(notebooks_temp, "csv/notebooks2_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(cells_temp, "csv/cells1_{0}_{1}.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(notebooks_temp, "{0}/notebooks2_{1}_{2}.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(cells_temp, "{0}/cells1_{1}_{2}.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
 
                 except MemoryError:
                     # Split data into 3 sections and try saving again.
@@ -360,30 +353,29 @@ def get_all_nb_cells(notebooks, local):
                         c7.to_csv("{0}/cells1_{1}_{2}_7.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                         c8.to_csv("{0}/cells1_{1}_{2}_8.csv".format(PATH, EXTENSION, count/COUNT_TRIGGER), index = False)
                     else:
-                        df_to_s3(n1, "csv/notebooks2_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(n2, "csv/notebooks2_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(n3, "csv/notebooks2_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(n4, "csv/notebooks2_{0}_{1}_4.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n1, "{0}/notebooks2_{1}_{2}_1.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n2, "{0}/notebooks2_{1}_{2}_2.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n3, "{0}/notebooks2_{1}_{2}_3.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(n4, "{0}/notebooks2_{1}_{2}_4.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
                         
-                        df_to_s3(c1, "csv/cells1_{0}_{1}_1.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c2, "csv/cells1_{0}_{1}_2.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c3, "csv/cells1_{0}_{1}_3.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c4, "csv/cells1_{0}_{1}_4.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c5, "csv/cells1_{0}_{1}_5.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c6, "csv/cells1_{0}_{1}_6.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c7, "csv/cells1_{0}_{1}_7.csv".format(EXTENSION, count/COUNT_TRIGGER))
-                        df_to_s3(c8, "csv/cells1_{0}_{1}_8.csv".format(EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c1, "{0}/cells1_{1}_{2}_1.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c2, "{0}/cells1_{1}_{2}_2.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c3, "{0}/cells1_{1}_{2}_3.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c4, "{0}/cells1_{1}_{2}_4.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c5, "{0}/cells1_{1}_{2}_5.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c6, "{0}/cells1_{1}_{2}_6.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c7, "{0}/cells1_{1}_{2}_7.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
+                        df_to_s3(c8, "{0}/cells1_{1}_{2}_8.csv".format(S3_PATH, EXTENSION, count/COUNT_TRIGGER))
 
                 # Empty current dictionaries.
                 new_nb_info = {}
                 all_cells_info = {}
                 print("CSVs saved")
 
-        date_string = datetime.datetime.now().strftime(r"%Y-%m-%d %H:%M:%S")
-
         # Initialize row of data.
         nb_info = {
             "file": file_name,
+            "google_collab": False,
             "nbformat": "",
             "nbformat_minor": "",
             "num_cells": 0,
@@ -394,37 +386,20 @@ def get_all_nb_cells(notebooks, local):
         }
 
         # Open notebooks as json.
-        if local:
-            try:
-                f = "../data/notebooks/{0}".format(file_name)
-                with open(f) as data_file:
-                    data = json.load(data_file)
-            except Exception:
-                # Report missed files.
-                msg = "{0}: had trouble finding or loading {1}".format(date_string, row["file"])
-                write_to_log("../logs/nb_parse_log.txt", msg)
-                missing.append(file_name)
-
-                # Add row with missing values.
-                if file_name not in new_nb_info:
-                    new_nb_info[file_name]= nb_info
-                
-                continue
-        else:
-            try:
-                obj = s3.Object("notebook-research","notebooks/{0}".format(file_name))
-                data = json.loads(obj.get()["Body"].read().decode("UTF-8"))
-            except Exception:
-                # Report missed files.
-                msg = "Notebook {0} did not open.".format(file_name)
-                write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
-                missing.append(file_name)
-                
-                # Add row with missing values.
-                if file_name not in new_nb_info:
-                    new_nb_info[file_name]= nb_info
-                
-                continue
+        try:
+            obj = s3.Object("notebook-research","notebooks/{0}".format(file_name))
+            data = json.loads(obj.get()["Body"].read().decode("UTF-8"))
+        except Exception:
+            # Report missed files.
+            msg = "Notebook {0} did not open.".format(file_name)
+            write_to_log("../logs/repo_metadata_cleaning_log.txt", msg)
+            missing.append(file_name)
+            
+            # Add row with missing values.
+            if file_name not in new_nb_info:
+                new_nb_info[file_name]= nb_info
+            
+            continue
 
         # If data was able to load as JSON, extract information.
         if data and isinstance(data, dict):
@@ -454,6 +429,7 @@ def get_all_nb_cells(notebooks, local):
                     
                     # If Google colab notebook, only Python 2.7 or 3.6 are possible.
                     if "colab" in metadata_keys:
+                        nb_info["google_collab"] = True
                         if (
                             "name" in kernel_keys 
                             and "display_name" in kernel_keys
@@ -541,6 +517,7 @@ def get_single_cell(cell_id, file_name, cell, nb_language):
         "lines_of_code": 0,
         "code": [],
         "imports": [],
+        "parsed_ast": False,
         "links": [],
         "num_execute_result": 0,
         "execute_result_keys": [],
@@ -640,7 +617,9 @@ def get_single_cell(cell_id, file_name, cell, nb_language):
         elif nb_language == "r":
             cell_info = parse_r(cell_info)
         elif nb_language == "julia":
-            cell_info = parse_ju(cell_info)        
+            cell_info = parse_ju(cell_info) 
+
+    cell_info["code"] = '\n'.join(cell_info["code"])       
 
     # Get data on cell output.        
     if "outputs" in cell_keys:
@@ -693,13 +672,63 @@ def parse_py_ast(list_of_code):
     imports = []
     functions = []
     classes = []
+    parsed_ast = False
     
     # Remove magic lines because AST doesnt understand magic.
-    code = "\n".join([c for c in list_of_code if not c.startswith("%")]).replace(";"," ")
-    
+    code = "\n".join([c for c in list_of_code if
+        not c.startswith("%") and
+        not c.startswith("!") and 
+        not c.startswith("?")
+    ]).replace(";"," ")            
+
+    def search_tree(tree):
+        for t in tree.body:
+            if type(t) == ast.ClassDef:
+                class_name = t.name
+                methods = []
+                attributes = []
+                for b in t.body:
+                    if type(b) == ast.FunctionDef:
+                        methods.append(b.name)
+                    elif type(b) == ast.Assign:
+                        try:
+                            attributes.append(b.targets[0].id)
+                        except Exception:
+                            attributes.append("")
+                classes.append([class_name, len(methods), len(attributes)])
+            
+            elif type(t) in [ast.ImportFrom, ast.Import]:
+                for name in t.names:
+                    n = name.name
+                    asname = name.asname
+                    if asname == None:
+                        asname = n
+
+                    if type(t) == ast.ImportFrom:
+                        module = t.module
+                        if module != None and n != None:
+                            n = module+"."+n
+
+                    imports.append([n, asname])
+            
+            elif type(t) == ast.FunctionDef:
+                name = t.name
+                args = [arg.arg for arg in ast.walk(t.args) if type(arg) == ast.arg]
+                functions.append([name, args])
+
+            elif type(t) == ast.Assign and type(t.value) == ast.Lambda:
+                try:
+                    name = t.targets[0].id
+                except Exception:
+                    name = ""
+                args = [arg.arg for arg in ast.walk(t.value.args) if type(arg) == ast.arg]
+                functions.append([name, args])
+
     # Try to parse the entire cell.
     try:
         tree = ast.parse(code)
+        parsed_ast = True
+        search_tree(tree)
                     
     # Exception due to syntax error in code. Try line by line.
     # We could still miss a multi-line import, but better than nothing.                
@@ -707,61 +736,20 @@ def parse_py_ast(list_of_code):
         for c in code.split("\n"):
             try:
                 tree = ast.parse(c)
+                parsed_ast = True
+                search_tree(tree)
                         
-            # If another syntax error, code cannot be read.
             except Exception:
-                return imports, functions, classes
-            
-
-    for t in tree.body:
-        if type(t) == ast.ClassDef:
-            class_name = t.name
-            methods = []
-            attributes = []
-            for b in t.body:
-                if type(b) == ast.FunctionDef:
-                    methods.append(b.name)
-                elif type(b) == ast.Assign:
-                    try:
-                        attributes.append(b.targets[0].id)
-                    except Exception:
-                        attributes.append("")
-            classes.append([class_name, len(methods), len(attributes)])
+                continue
         
-        elif type(t) in [ast.ImportFrom, ast.Import]:
-            for name in t.names:
-                n = name.name
-                asname = name.asname
-                if asname == None:
-                    asname = n
-
-                if type(t) == ast.ImportFrom:
-                    module = t.module
-                    if module != None and n != None:
-                        n = module+"."+n
-
-                imports.append([n, asname])
-        
-        elif type(t) == ast.FunctionDef:
-            name = t.name
-            args = [arg.arg for arg in ast.walk(t.args) if type(arg) == ast.arg]
-            functions.append([name, args])
-
-        elif type(t) == ast.Assign and type(t.value) == ast.Lambda:
-            try:
-                name = t.targets[0].id
-            except Exception:
-                name = ""
-            args = [arg.arg for arg in ast.walk(t.value.args) if type(arg) == ast.arg]
-            functions.append([name, args])
-        
-    return imports, functions, classes
+    return imports, functions, classes, parsed_ast
 
 def parse_py(cell_info):
     """ Parse imports, functions, classes, and comments for Python code cells. """
     
-    imports, functions, classes = parse_py_ast(cell_info["code"])
+    imports, functions, classes, parsed_ast = parse_py_ast(cell_info["code"])
     cell_info["imports"] = imports
+    cell_info["parsed_ast"] = parsed_ast
     cell_info["functions"] = functions
     cell_info["classes"] = classes
     cell_info["num_imports"] = len(imports)
