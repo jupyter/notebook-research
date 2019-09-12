@@ -10,7 +10,7 @@ Create an AWS account and request read access to the `jupyter-notebook-data` S3 
 Individual files can be downloaded with the command line interface. Note that `cells.csv` is nearly 80 GB, so you must have adequate storage on your device and it may take some time to copy down from the bucket.
 
 ```
-aws s3 cp s3://jupyter-notebook-data/csv_final/repos.csv
+aws s3 cp s3://jupyter-notebook-data/csv_final/repos.csv csv_final/repos.csv
 ```
 
 Alternatively, to download CSV files with a Python script, you can use [boto3](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html?id=docs_gateway), the AWS SDK for Python. Below is an example of how to download the cells dataset.
